@@ -16,12 +16,20 @@ services:
       NETMAP_PORT: "8080"
       NETMAP_DATA: "/data"
       NETMAP_REFRESH: "30"
-      # Bootstrap credential only. The server forces it to be replaced at first
-      # sign-in and stores the replacement (hashed) on the /data volume, so
-      # these two values stop being the real credential the moment someone logs
-      # in. Leave them; do not put the real password here.
-      NETMAP_USER: "Mavrone"
-      NETMAP_PASS: "P@55w0rd"
+      # Bootstrap credential. NOT literals -- these come from an untracked
+      # `.env` file sitting next to this compose file on the box (see
+      # deploy/README or the repo README "First run").
+      #
+      # They were literals once, and this repository is public: that published
+      # `Mavrone` / `P@55w0rd` pair alongside a known URL is a race between the
+      # owner's first login and anyone reading the repo. Whoever logs in first
+      # sets the password, and the forced-change flow would then lock the owner
+      # out rather than the attacker. A bootstrap credential is only safe while
+      # it is unpublished.
+      #
+      # Unset => the server refuses to start rather than serving with a guess.
+      NETMAP_USER: "${NETMAP_USER:?set NETMAP_USER in .env}"
+      NETMAP_PASS: "${NETMAP_PASS:?set NETMAP_PASS in .env}"
       # Shared secret for remote push agents. Unset => ingest returns 503,
       # because an open ingest endpoint lets anyone paint the board green.
       NETMAP_PUSH_TOKEN: "${NETMAP_PUSH_TOKEN:-}"

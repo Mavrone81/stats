@@ -265,8 +265,23 @@ directory, or the `.bak` files, the database and the source would be
 downloadable. This page is an inventory of everything we own and where it is
 weak; treat it as sensitive.
 
-**Bootstrap credential.** Ships as `Mavrone` / `P@55w0rd` with `must_change`
-set. Until it is replaced, **every authenticated route redirects to `/change`** —
+**Bootstrap credential.** Set in an **untracked `.env`** beside
+`docker-compose.yml` on the box — never committed:
+
+```bash
+printf 'NETMAP_USER=%s\nNETMAP_PASS=%s\n' "youruser" "$(openssl rand -base64 18)" > /opt/netmap/.env
+chmod 600 /opt/netmap/.env
+```
+
+It was a committed literal (`Mavrone` / `P@55w0rd`) until it was noticed that
+this repository is public. A published default alongside a known URL is a race
+between the owner's first login and anyone reading the repo — and because the
+first person in gets to set the password, the forced-change flow would lock the
+*owner* out rather than the attacker. A bootstrap credential is only safe while
+it is unpublished. `docker compose` now refuses to start if either value is
+unset, rather than falling back to a guessable default.
+
+The credential ships with `must_change` Until it is replaced, **every authenticated route redirects to `/change`** —
 the board and the API are unreachable. A default that is merely "documented as
 temporary" stays live for years; one the server refuses to work around does not.
 
