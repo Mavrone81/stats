@@ -1,0 +1,25 @@
+# Pull-deploy unit for netmap. Triggered by netmap-deploy.timer, never enabled
+# as a service in its own right (Type=oneshot, no [Install] WantedBy for the
+# service -- the TIMER is what gets enabled).
+#
+#   cp deploy/netmap-deploy.{service,timer} /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now netmap-deploy.timer
+[Unit]
+Description=netmap pull deploy
+Documentation=file:///opt/netmap/README.md
+# Docker must be up: the deploy runs the test suite in a container and
+# restarts the app container.
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/netmap
+ExecStart=/opt/netmap/deploy/auto-deploy-netmap.sh
+# Output goes to the journal, so `journalctl -u netmap-deploy` is the deploy
+# history. Deliberately NOT a file in /opt/netmap: deploy logs living inside
+# the deploy target is how a working tree ends up dirty and how this script
+# then refuses to run.
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=600

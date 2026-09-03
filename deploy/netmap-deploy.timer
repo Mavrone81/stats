@@ -1,0 +1,16 @@
+[Unit]
+Description=Run netmap pull deploy every 5 minutes
+Documentation=file:///opt/netmap/README.md
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+# Without this every host running this timer would fetch on the same second.
+RandomizedDelaySec=45
+# If the box was off when a run was due, run once on boot rather than
+# silently skipping -- a deploy that never happened is the failure mode that
+# looks exactly like a deploy that succeeded.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

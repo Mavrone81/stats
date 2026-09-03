@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>bevoraSG network map</title>
+<style>
+/* Light is the base palette. Dark redefines ONLY the tokens, twice: once for
+   the system preference and once for an explicit toggle, so neither can strand
+   the other. No colour is ever defined only inside a media query. */
+:root{
+  --bg:#f5f6f8; --card:#ffffff; --fg:#11161d; --mut:#5b6775; --line:#e0e4e9;
+  --acc:#2563eb; --up:#0e7c4a; --upbg:#e7f6ee; --bad:#b42318; --badbg:#fdeceb;
+  --warnc:#8a5a00; --warnbg:#fdf3e0; --chip:#eef1f5; --shadow:0 1px 2px rgba(16,24,40,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme=light]){
+    --bg:#0d1117; --card:#161b22; --fg:#e6edf3; --mut:#8b949e; --line:#2c333c;
+    --acc:#5b90ff; --up:#3fb950; --upbg:#10261a; --bad:#f85149; --badbg:#2b1213;
+    --warnc:#e3b341; --warnbg:#2a2113; --chip:#21262d; --shadow:none;
+  }
+}
+:root[data-theme=dark]{
+  --bg:#0d1117; --card:#161b22; --fg:#e6edf3; --mut:#8b949e; --line:#2c333c;
+  --acc:#5b90ff; --up:#3fb950; --upbg:#10261a; --bad:#f85149; --badbg:#2b1213;
+  --warnc:#e3b341; --warnbg:#2a2113; --chip:#21262d; --shadow:none;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-text-size-adjust:100%}
+a{color:var(--acc)}
+header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:14px 20px;background:var(--card);border-bottom:1px solid var(--line)}
+h1{font-size:16px;margin:0;font-weight:650;letter-spacing:-.01em}
+.grow{flex:1}
+.meta{font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums}
+nav{display:flex;gap:4px;padding:0 12px;background:var(--card);
+  border-bottom:1px solid var(--line);overflow-x:auto}
+nav button{background:none;border:0;border-bottom:2px solid transparent;color:var(--mut);
+  padding:11px 14px;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap;min-height:44px}
+nav button[aria-selected=true]{color:var(--fg);border-bottom-color:var(--acc)}
+main{padding:20px;max-width:1400px;margin:0 auto}
+section[hidden]{display:none}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:16px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card h2{font-size:13px;margin:0 0 12px;text-transform:uppercase;
+  letter-spacing:.05em;color:var(--mut)}
+.kpis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kpi .n{font-size:27px;font-weight:680;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kpi .l{font-size:12px;color:var(--mut);margin-top:2px}
+.kpi.bad .n{color:var(--bad)} .kpi.good .n{color:var(--up)} .kpi.warn .n{color:var(--warnc)}
+/* Every table scrolls inside its own box. The page body must never scroll
+   sideways -- a horizontally-shifted board is unreadable on a phone. */
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);
+  font-weight:600;position:sticky;top:0;background:var(--card)}
+tbody tr:hover{background:var(--chip)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;
+  font-weight:650;white-space:nowrap}
+.pill.up{background:var(--upbg);color:var(--up)}
+.pill.down{background:var(--badbg);color:var(--bad)}
+/* Acked states are amber, never red. Red stops carrying information the moment
+   most red rows are states we chose on purpose. */
+.pill.ack{background:var(--warnbg);color:var(--warnc)}
+.pill.pending{background:var(--chip);color:var(--mut)}
+.seg{font-size:11px;color:var(--mut);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.bar{display:flex;gap:1px;height:34px;align-items:flex-end}
+.bar div{flex:1;min-width:2px;border-radius:1px 1px 0 0;background:var(--up)}
+.bar div.p{background:var(--bad)}
+.bar div.n{background:var(--line)}
+.inv{padding:10px 12px;border-radius:8px;font-size:13px;font-weight:600}
+.inv.ok{background:var(--upbg);color:var(--up)}
+.inv.no{background:var(--badbg);color:var(--bad)}
+.banner{padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:14px;
+  background:var(--warnbg);color:var(--warnc);border:1px solid var(--line)}
+button.act{background:var(--chip);border:1px solid var(--line);color:var(--fg);
+  border-radius:7px;padding:5px 10px;font:inherit;font-size:12px;cursor:pointer;min-height:32px}
+button.act:hover{border-color:var(--acc)}
+textarea{width:100%;min-height:340px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+  background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:11px}
+.msg{margin-top:10px;font-size:13px}
+.msg.ok{color:var(--up)} .msg.err{color:var(--bad)}
+/* Simple view */
+.simple h3{font-size:15px;margin:0 0 6px}
+.simple p{margin:0 0 10px;max-width:68ch;color:var(--fg)}
+.simple .q{color:var(--mut);font-size:13px}
+.stack{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.box{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--card)}
+.box .hd{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-weight:650}
+.dot{width:10px;height:10px;border-radius:99px;background:var(--up);flex:none}
+.dot.bad{background:var(--bad)} .dot.ack{background:var(--warnc)} .dot.unk{background:var(--mut)}
+.unver{font-size:12px;color:var(--warnc);font-weight:600}
+figure{margin:0;overflow-x:auto}
+svg{display:block;min-width:660px;max-width:100%;height:auto}
+.svg-l{fill:var(--fg);font:12px ui-sans-serif,system-ui,sans-serif}
+.svg-s{fill:var(--mut);font:10px ui-monospace,monospace}
+.svg-box{fill:var(--card);stroke:var(--line);stroke-width:1.5}
+.svg-line{stroke:var(--line);stroke-width:1.5;fill:none}
+.svg-dash{stroke:var(--bad);stroke-width:1.5;fill:none;stroke-dasharray:5 4}
+/* Mobile rules live INSIDE this query so the desktop layout cannot regress. */
+@media (max-width:640px){
+  main{padding:12px}
+  header{padding:11px 14px;gap:8px}
+  h1{font-size:15px;width:100%}
+  .card{padding:13px}
+  .kpi .n{font-size:22px}
+  nav button{padding:11px 12px;font-size:13px}
+  button.act{min-height:44px;padding:8px 14px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>bevoraSG network map</h1>
+  <span class="grow"></span>
+  <span class="meta" id="meta">loading…</span>
+  <button class="act" id="theme" title="Toggle theme">◐</button>
+  <button class="act" id="refresh">Refresh</button>
+  <form method="POST" action="/logout" style="margin:0"><button class="act" type="submit">Sign out</button></form>
+</header>
+<nav role="tablist">
+  <button role="tab" aria-selected="true"  data-t="overview">Overview</button>
+  <button role="tab" aria-selected="false" data-t="board">Dashboard</button>
+  <button role="tab" aria-selected="false" data-t="incidents">Incidents</button>
+  <button role="tab" aria-selected="false" data-t="diagram">Network diagram</button>
+  <button role="tab" aria-selected="false" data-t="simple">Simple view</button>
+  <button role="tab" aria-selected="false" data-t="targets">Targets</button>
+</nav>
+<main>
+  <div id="degraded"></div>
+
+  <section id="overview">
+    <div class="kpis" id="kpis"></div>
+    <div class="card"><h2>Availability, last 24h</h2><div class="bar" id="timeline"></div>
+      <div class="meta" id="tlmeta" style="margin-top:6px"></div></div>
+    <div class="card"><h2>Discriminating check</h2><div id="invariant"></div>
+      <p class="meta" style="margin:8px 0 0">Open incidents are counted from the
+      event table; down rows are counted from the live board. They are computed
+      from different sources and must agree. A mismatch means an incident is
+      stranded or was never opened — it is the cheapest signal that this tool
+      is lying to you.</p></div>
+    <div class="card"><h2>Certificates expiring soon</h2><div id="certs"></div></div>
+    <div class="stack">
+      <div class="card"><h2>Flappiest</h2><div id="flap"></div></div>
+      <div class="card"><h2>Slowest</h2><div id="slow"></div></div>
+    </div>
+  </section>
+
+  <section id="board" hidden>
+    <div class="card"><h2>Live status</h2>
+      <div class="tw"><table>
+        <thead><tr><th>Service</th><th>Segment</th><th>Endpoint</th><th>State</th>
+          <th class="num">ms</th><th class="num">Cert</th><th>Detail</th><th></th></tr></thead>
+        <tbody id="rows"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="incidents" hidden>
+    <div class="card"><h2>Incident log</h2>
+      <div class="tw"><table>
+        <thead><tr><th>Service</th><th>Segment</th><th>Down at</th><th>Recovered</th>
+          <th class="num">Duration</th></tr></thead>
+        <tbody id="events"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="diagram" hidden>
+    <div class="card"><h2>Technical topology</h2><figure id="topo"></figure></div>
+  </section>
+
+  <section id="simple" hidden class="simple"></section>
+
+  <section id="targets" hidden>
+    <div class="card">
+      <h2>Live target list</h2>
+      <p class="meta">This is the list that is <strong>actually probed</strong>.
+      It is stored in the data volume, not in the source — reading
+      <code>server.py</code> tells you nothing about what runs here. Editing and
+      saving takes effect on the next cycle; no redeploy, no restart.</p>
+      <textarea id="ta" spellcheck="false" aria-label="Target list JSON"></textarea>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="act" id="save">Save target list</button>
+        <button class="act" id="reload">Discard changes</button>
+      </div>
+      <div class="msg" id="tmsg"></div>
+    </div>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let DATA = {status:null, over:null, events:null};
+
+/* theme ---------------------------------------------------------------- */
+try{ const t=localStorage.getItem("netmap-theme"); if(t) document.documentElement.dataset.theme=t; }catch(e){}
+$("#theme").onclick = () => {
+  const cur = document.documentElement.dataset.theme
+    || (matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light");
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try{ localStorage.setItem("netmap-theme", next); }catch(e){}
+};
+
+/* tabs ----------------------------------------------------------------- */
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x =>
+    x.setAttribute("aria-selected", String(x === b)));
+  document.querySelectorAll("main section").forEach(s =>
+    s.hidden = s.id !== b.dataset.t);
+  try{ localStorage.setItem("netmap-tab", b.dataset.t); }catch(e){}
+  if (b.dataset.t === "incidents") loadEvents();
+  if (b.dataset.t === "targets")   loadTargets();
+});
+
+async function api(p, o){
+  const r = await fetch(p, Object.assign({headers:{Accept:"application/json"}}, o||{}));
+  if (r.status === 401){ location.href = "/login"; throw new Error("auth"); }
+  if (r.status === 403){ location.href = "/change"; throw new Error("change"); }
+  return {ok:r.ok, status:r.status, body:await r.json().catch(()=>({}))};
+}
+
+const ago = ts => { const s = Math.max(0, Math.floor(Date.now()/1000 - ts));
+  if (s < 60) return s+"s"; if (s < 3600) return Math.floor(s/60)+"m";
+  if (s < 86400) return Math.floor(s/3600)+"h"; return Math.floor(s/86400)+"d"; };
+const dur = s => s==null ? "—" : s<60 ? s+"s" : s<3600 ? Math.round(s/60)+"m"
+  : s<86400 ? (s/3600).toFixed(1)+"h" : (s/86400).toFixed(1)+"d";
+const when = ts => ts ? new Date(ts*1000).toLocaleString() : "—";
+const ep = r => (r.opts && r.opts.host)
+  ? esc(r.opts.host) + esc(r.opts.path && r.opts.path !== "/" ? r.opts.path : "")
+  : esc(r.ip) + ":" + r.port;
+
+function statePill(r){
+  if (r.up && r.ack) return '<span class="pill ack">up · acked</span>';
+  if (r.up)          return '<span class="pill up">up</span>';
+  if (r.ack === "perm")   return '<span class="pill ack">down by design</span>';
+  if (r.ack === "window") return '<span class="pill ack">maintenance</span>';
+  return '<span class="pill down">DOWN</span>';
+}
+
+/* render --------------------------------------------------------------- */
+function renderBoard(d){
+  DATA.status = d;
+  $("#meta").textContent = `${d.hosts.length} targets · cycle ${ago(d.ts)} ago · every ${d.refresh}s`;
+  $("#degraded").innerHTML = d.history_ok ? "" :
+    '<div class="banner">History storage is unavailable, so incidents, latency '
+    + 'and availability are not being recorded. Live reachability below is '
+    + 'unaffected — that is deliberate: storage failure must never take the '
+    + 'board down.</div>';
+  $("#rows").innerHTML = d.hosts.map(r => `<tr>
+    <td><strong>${esc(r.label)}</strong>${r.pending
+        ? ' <span class="pill pending">confirming…</span>' : ""}</td>
+    <td class="seg">${esc(r.seg)}</td>
+    <td class="seg">${ep(r)}</td>
+    <td>${statePill(r)}${r.ack_note ? ' <span class="seg">'+esc(r.ack_note)+'</span>' : ""}</td>
+    <td class="num">${r.ms ?? "—"}</td>
+    <td class="num">${r.cert_days == null ? "—"
+        : r.cert_days < 0 ? '<span class="pill down">expired</span>'
+        : r.cert_days <= 21 ? '<span class="pill ack">'+r.cert_days+'d</span>'
+        : r.cert_days + "d"}</td>
+    <td class="seg">${esc(r.detail)}</td>
+    <td><button class="act" data-ip="${esc(r.ip)}" data-port="${r.port}"
+        data-key="${esc(r.ip)}:${r.port}">Probe</button></td></tr>`).join("");
+  $("#rows").querySelectorAll("button").forEach(b => b.onclick = async () => {
+    b.textContent = "…";
+    const r = await api(`/api/probe?ip=${encodeURIComponent(b.dataset.ip)}&port=${b.dataset.port}`);
+    b.textContent = r.body.raw ? (r.body.raw.up ? "up now" : "down now") : "error";
+    setTimeout(() => b.textContent = "Probe", 4000);
+  });
+  renderSimple(d);
+  renderTopo(d);
+}
+
+function renderOverview(o){
+  DATA.over = o;
+  const av = o.availability == null ? "—" : o.availability.toFixed(2) + "%";
+  $("#kpis").innerHTML = `
+    <div class="kpi good"><div class="n">${o.up}</div><div class="l">up</div></div>
+    <div class="kpi ${o.down_unacked ? "bad" : ""}"><div class="n">${o.down_unacked}</div>
+      <div class="l">down (unacked)</div></div>
+    <div class="kpi ${o.down - o.down_unacked ? "warn" : ""}"><div class="n">${o.down - o.down_unacked}</div>
+      <div class="l">acked / by design</div></div>
+    <div class="kpi"><div class="n">${av}</div><div class="l">availability 24h</div></div>
+    <div class="kpi ${o.open_incidents ? "bad" : ""}"><div class="n">${o.open_incidents}</div>
+      <div class="l">open incidents</div></div>
+    <div class="kpi ${o.cert_warn.length ? "warn" : ""}"><div class="n">${o.cert_warn.length}</div>
+      <div class="l">certs &lt; 21d</div></div>`;
+  const tl = o.timeline || [];
+  $("#timeline").innerHTML = tl.length ? tl.map(b => b.pct == null
+    ? '<div class="n" style="height:6px"></div>'
+    : `<div class="${b.pct < 100 ? "p" : ""}" style="height:${Math.max(6, b.pct*.34)}px"
+        title="${new Date(b.ts*1000).toLocaleString()} — ${b.pct}%"></div>`).join("")
+    : '<span class="meta">no samples yet</span>';
+  $("#tlmeta").textContent = tl.length
+    ? `${tl.length} buckets · red = a target was down in that bucket` : "";
+  $("#invariant").innerHTML = `<div class="inv ${o.invariant_ok ? "ok" : "no"}">`
+    + (o.invariant_ok ? "✓ " : "✗ ") + esc(o.invariant_detail) + "</div>";
+  $("#certs").innerHTML = o.cert_warn.length
+    ? '<div class="tw"><table><thead><tr><th>Service</th><th>Host</th>'
+      + '<th class="num">Days left</th></tr></thead><tbody>'
+      + o.cert_warn.map(c => `<tr><td>${esc(c.label)}</td><td class="seg">${esc(c.host)}</td>
+        <td class="num">${c.days < 0
+          ? '<span class="pill down">expired '+Math.abs(c.days)+'d</span>' : c.days}</td></tr>`).join("")
+      + "</tbody></table></div>"
+    : '<p class="meta">Nothing expiring within 21 days.</p>';
+  const list = (rows, f) => rows.length
+    ? '<div class="tw"><table><tbody>' + rows.map(f).join("") + "</tbody></table></div>"
+    : '<p class="meta">Nothing recorded in this window.</p>';
+  $("#flap").innerHTML = list(o.flappiest || [],
+    r => `<tr><td>${esc(r.label)}</td><td class="num">${r.count} outages</td></tr>`);
+  $("#slow").innerHTML = list(o.slowest || [],
+    r => `<tr><td class="seg">${esc(r.ip)}:${r.port}</td><td class="num">${r.ms} ms</td></tr>`);
+}
+
+async function loadEvents(){
+  const r = await api("/api/events?limit=200");
+  const ev = r.body.events || [];
+  $("#events").innerHTML = ev.length ? ev.map(e => `<tr>
+    <td><strong>${esc(e.label)}</strong></td><td class="seg">${esc(e.seg)}</td>
+    <td class="seg">${when(e.down_ts)}</td>
+    <td class="seg">${e.up_ts ? when(e.up_ts) : '<span class="pill down">ongoing</span>'}</td>
+    <td class="num">${e.up_ts ? dur(e.duration) : dur(Math.floor(Date.now()/1000 - e.down_ts))}</td>
+    </tr>`).join("")
+    : '<tr><td colspan="5" class="meta">No incidents recorded.</td></tr>';
+}
+
+async function loadTargets(){
+  const r = await api("/api/targets");
+  $("#ta").value = JSON.stringify(r.body.targets || [], null, 2);
+  $("#tmsg").textContent = "Source: " + (r.body.source || "?");
+  $("#tmsg").className = "msg";
+}
+$("#save").onclick = async () => {
+  let parsed;
+  try { parsed = JSON.parse($("#ta").value); }
+  catch(e){ $("#tmsg").className = "msg err";
+            $("#tmsg").textContent = "Not valid JSON: " + e.message; return; }
+  const r = await api("/api/targets", {method:"POST",
+    headers:{"Content-Type":"application/json", Accept:"application/json"},
+    body: JSON.stringify(parsed)});
+  $("#tmsg").className = "msg " + (r.ok ? "ok" : "err");
+  $("#tmsg").textContent = r.ok
+    ? `Saved ${r.body.count} targets. Live from the next cycle.`
+    : "Rejected: " + JSON.stringify(r.body.detail || r.body.error);
+};
+$("#reload").onclick = loadTargets;
+
+/* Simple view -----------------------------------------------------------
+   Non-technical readers make real decisions from this tab, and they read the
+   prose, not the diagram. So the prose has to be exact. In particular this
+   page never claims two segments are "isolated" or "cannot affect each other"
+   — what we have measured is the absence of a ROUTE from the places we
+   probed, which is a different and much weaker claim than an air gap. Where a
+   thing has not been tested, it says so.                                  */
+function renderSimple(d){
+  const segs = {};
+  d.hosts.forEach(r => {
+    const s = segs[r.seg] = segs[r.seg] || {up:0, down:0, acked:0, rows:[]};
+    if (r.up) s.up++; else if (r.ack) s.acked++; else s.down++;
+    s.rows.push(r);
+  });
+  const NOTE = {
+    "edge-165": "Public websites and apps. All of them are served by one machine "
+      + "behind one shared front door, so each is checked by name and by the answer "
+      + "it gives — not just by whether the machine is switched on.",
+    "host-165": "The machine itself, plus two database ports that are supposed to "
+      + "be closed to the outside world. Those two are checked backwards: they go "
+      + "red if they ever become reachable.",
+    "gadonghr":  "The HR system. Every part of it answers on one address under a "
+      + "different path, so each part is checked at its own path.",
+    "bevora-ops":"The operations server. Nothing here can be reached from where "
+      + "this checker runs."
+  };
+  const card = (name, s) => {
+    const bad = s.down > 0, ack = s.down === 0 && s.acked > 0;
+    return `<div class="box">
+      <div class="hd"><span class="dot ${bad?"bad":ack?"ack":""}"></span>${esc(name)}</div>
+      <p>${bad ? `<strong>${s.down} of ${s.rows.length} not answering.</strong>`
+               : `All ${s.rows.length} answering normally.`}
+         ${s.acked ? ` ${s.acked} known and accepted.` : ""}</p>
+      <p class="q">${esc(NOTE[name] || "")}</p></div>`;
+  };
+  $("#simple").innerHTML = `
+    <div class="card">
+      <h3>What this page is</h3>
+      <p>It checks, every ${d.refresh} seconds, whether each of our systems
+         actually answers. A green mark means the system replied correctly just
+         now — not merely that a server is powered on.</p>
+      <p>A red mark means it failed twice in a row. One failed check is never
+         shown as an outage, because ordinary restarts cause brief blips and
+         reporting those as outages makes the page impossible to trust.</p>
+      <p class="q">Amber means we already know about it and decided it is
+         acceptable, either permanently or during planned work. Red always
+         means something nobody has accounted for.</p>
+    </div>
+    <div class="stack">${Object.keys(segs).sort().map(k => card(k, segs[k])).join("")}</div>
+    <div class="card">
+      <h3>How separate are these machines?</h3>
+      <p>All three machines sit on <strong>one shared private network</strong>.
+         They are not separated from each other; what limits them is a set of
+         firewall rules deciding which doors are open.</p>
+      <p>Measured, from the main application server: the operations server
+         accepts traffic on <strong>exactly one port</strong> across that
+         private network — the one its monitoring agents report into.
+         Everything else tried (remote login, web) was refused. From the public
+         internet it currently accepts nothing at all, except remote login from
+         one specific address.</p>
+      <p><strong>That is a setting, not a wall.</strong> Changing one firewall
+         rule would make these machines fully reachable to one another. Nobody
+         should read this page as saying they are isolated or air-gapped, or
+         that a problem on one cannot reach another.</p>
+      <p class="q">An earlier version of this page said there was &ldquo;no
+         network route&rdquo; to the operations server. That was wrong — only
+         its public address had been tested and the private path was never
+         checked. The correction is recorded here rather than quietly edited
+         out, because a page that silently revises what it claimed cannot be
+         audited.</p>
+      <p class="unver">Not verified: whether the office network, or any machine
+         outside these three, can reach them. Nobody has tested that, so this
+         page does not claim it either way.</p>
+    </div>
+    <div class="card">
+      <h3>What this page cannot tell you</h3>
+      <p>It checks that a system replies, and that its security certificate is
+         still valid. It does not check that the data inside is correct, that
+         backups exist and restore, or that logins work. A system can be green
+         here and still be wrong in ways this page cannot see.</p>
+    </div>`;
+}
+
+/* Technical topology ----------------------------------------------------
+   Drawn from the live snapshot rather than hand-maintained, so it cannot drift
+   away from what is actually probed. */
+function renderTopo(d){
+  const order = ["edge-165","host-165","gadonghr","bevora-ops"];
+  const segs = {};
+  d.hosts.forEach(r => (segs[r.seg] = segs[r.seg] || []).push(r));
+  const keys = order.filter(k => segs[k]).concat(
+    Object.keys(segs).filter(k => !order.includes(k)).sort());
+  const W = 900, top = 96, rowH = 26, boxW = 300, gap = 28;
+  let y = top, parts = [], maxY = top;
+  keys.forEach((k, i) => {
+    const rows = segs[k];
+    const col = i % 2, x = 60 + col * (boxW + gap * 3);
+    if (col === 0 && i) y = maxY + gap;
+    const h = 34 + rows.length * rowH;
+    const down = rows.filter(r => !r.up && !r.ack).length;
+    parts.push(`<rect x="${x}" y="${y}" width="${boxW}" height="${h}" rx="9" class="svg-box"/>
+      <text x="${x+12}" y="${y+21}" class="svg-l" font-weight="650">${esc(k)}</text>
+      <text x="${x+boxW-12}" y="${y+21}" class="svg-s" text-anchor="end">${
+        down ? down + " down" : rows.length + " ok"}</text>`);
+    rows.forEach((r, j) => {
+      const ry = y + 34 + j * rowH + 12;
+      const c = !r.up && !r.ack ? "var(--bad)" : r.ack ? "var(--warnc)" : "var(--up)";
+      parts.push(`<circle cx="${x+18}" cy="${ry-4}" r="4" fill="${c}"/>
+        <text x="${x+32}" y="${ry}" class="svg-s">${esc(r.label)}</text>`);
+    });
+    maxY = Math.max(maxY, y + h);
+  });
+  const H = maxY + 40;
+  const svg = `<svg viewBox="0 0 ${W} ${H}" role="img"
+      aria-label="Topology of monitored segments">
+    <text x="60" y="34" class="svg-l" font-weight="650">Internet</text>
+    <text x="60" y="54" class="svg-s">probes originate from the netmap host</text>
+    <path d="M62 64 L62 ${top-8}" class="svg-line"/>
+    <path d="M${60+boxW+gap*3+2} 64 L${60+boxW+gap*3+2} ${top-8}" class="svg-dash"/>
+    <text x="${60+boxW+gap*3+10}" y="80" class="svg-s">dashed = public ports filtered (VPC path exists)</text>
+    ${parts.join("")}</svg>`;
+  $("#topo").innerHTML = svg;
+}
+
+/* poll ----------------------------------------------------------------- */
+async function tick(){
+  try{
+    const [s, o] = await Promise.all([api("/api/status"), api("/api/overview")]);
+    renderBoard(s.body); renderOverview(o.body);
+  }catch(e){ $("#meta").textContent = "connection lost — retrying"; }
+}
+$("#refresh").onclick = tick;
+try{ const t = localStorage.getItem("netmap-tab");
+     if (t) document.querySelector(`nav button[data-t="${t}"]`)?.click(); }catch(e){}
+tick();
+setInterval(tick, 15000);
+</script>
+</body>
+</html>

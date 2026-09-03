@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+# Nothing here needs write access. The deploy half of CI/CD is a PULL on the
+# box (see deploy/auto-deploy-netmap.sh), not a push from a runner, so this
+# workflow never holds a deploy credential at all -- see the note in `deploy`.
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    # The SAME image as production. The whole point of a zero-dependency
+    # stdlib tool is that "works in CI" and "works on the box" are the same
+    # claim; running the suite on a runner's own Python would quietly weaken
+    # that to "works on some Python".
+    container:
+      image: python:3.12-slim
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unit tests
+        # NETMAP_DATA points at a scratch dir: the suite must not need a
+        # writable /data, a network, or a real database. If this step ever
+        # starts needing one of those, the tool has grown a dependency the
+        # design deliberately refuses.
+        env:
+          NETMAP_DATA: /tmp/netmap-ci
+        run: python3 -m unittest -v test_server
+
+      - name: Estate boundary — non-RMA hosts only
+        # RMA and non-RMA never share a box, an account or a credential. A
+        # monitoring board is exactly the artefact that merges two estates one
+        # convenient line at a time.
+        run: python3 scripts/assert-non-rma-only.py
+
+      - name: Guards must be able to fail
+        # The step that matters most. It breaks each safety guard in turn and
+        # requires the suite to FAIL. A test that passes against code where the
+        # feature is unwired is not a test, and this repo's sibling project
+        # found four of its own verification scripts in precisely that state.
+        run: |
+          apt-get update -qq && apt-get install -y -qq git >/dev/null
+          bash scripts/assert-guards-can-fail.sh
+
+      - name: Working tree unchanged by the guard check
+        # assert-guards-can-fail.sh edits server.py and restores it via a trap.
+        # If a future change breaks that restore, CI would start shipping a
+        # deliberately-sabotaged file. Cheap to assert, catastrophic to miss.
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          test -z "$(git status --porcelain)" || {
+            echo "::error::guard check left the working tree modified"
+            git status --porcelain; git --no-pager diff | head -40; exit 1; }
+
+      - name: Frontend sanity
+        # No build step and no framework, so there is no bundler to catch a
+        # truncated file. This is the minimum that would.
+        run: |
+          python3 - <<'PY'
+          s = open("index.html", encoding="utf-8").read()
+          for tag in ("div", "section", "table", "script", "style", "svg"):
+              o, c = s.count("<" + tag), s.count("</" + tag + ">")
+              assert o == c, f"<{tag}>: {o} open vs {c} close"
+          assert "/api/status" in s and "/api/overview" in s
+          # Mobile rules must stay inside a max-width query or the desktop
+          # layout can regress silently.
+          assert "@media (max-width:640px)" in s
+          print(f"index.html OK ({len(s)} bytes)")
+          PY
+
+      - name: Deploy scripts are syntactically valid
+        run: |
+          apt-get install -y -qq shellcheck >/dev/null 2>&1 || true
+          for f in deploy/*.sh scripts/*.sh; do bash -n "$f" && echo "  OK  $f"; done
+
+      - name: No pipe hides a remote exit status in verify.sh
+        # verify.sh once ran the test suite as `ssh host "... | tail -3"`, which
+        # returns tail's status, not the suite's -- so a suite failing every
+        # test still exited 0 and the deploy looked verified. Guard the fix.
+        run: |
+          # ^[^#]* so the comment that documents the old bug does not trip it.
+          if grep -nE '^[^#]*ssh .*(unittest|docker run).*\|' deploy/verify.sh; then
+            echo "::error::a remote command's exit status is being swallowed by a pipe"
+            exit 1
+          fi
+          echo "  OK  no remote exit status is piped away"

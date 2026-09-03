@@ -1,0 +1,36 @@
+# bevoraSG netmap -- runs on the bevora-ops host, published to the world as
+# https://status.bevorasg.com by the host's nginx (see deploy/nginx-status.conf).
+#
+# The container binds 127.0.0.1 ONLY. nginx is the sole way in, which is what
+# lets the app trust the last X-Forwarded-For hop and unconditionally set
+# Secure on its session cookie.
+services:
+  netmap:
+    image: python:3.12-slim
+    container_name: netmap
+    restart: unless-stopped
+    command: ["python3", "/app/server.py"]
+    working_dir: /app
+    environment:
+      PYTHONUNBUFFERED: "1"
+      NETMAP_PORT: "8080"
+      NETMAP_DATA: "/data"
+      NETMAP_REFRESH: "30"
+      # Bootstrap credential only. The server forces it to be replaced at first
+      # sign-in and stores the replacement (hashed) on the /data volume, so
+      # these two values stop being the real credential the moment someone logs
+      # in. Leave them; do not put the real password here.
+      NETMAP_USER: "Mavrone"
+      NETMAP_PASS: "P@55w0rd"
+      # Shared secret for remote push agents. Unset => ingest returns 503,
+      # because an open ingest endpoint lets anyone paint the board green.
+      NETMAP_PUSH_TOKEN: "${NETMAP_PUSH_TOKEN:-}"
+    volumes:
+      # Source read-only: the running container cannot rewrite its own code.
+      - ./:/app:ro
+      # Everything mutable -- database, live target list, acks, credentials.
+      - netmap_data:/data
+    ports:
+      - "127.0.0.1:8080:8080"
+volumes:
+  netmap_data:
