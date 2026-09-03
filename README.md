@@ -466,21 +466,21 @@ client-controlled and is never read.
 
 Recorded here because a monitoring board is also an audit:
 
-1. **`med.awakenfs.store` — app healthy, DNS record missing.** The upstream
-   (`medusa-web` on `127.0.0.1:20021`) is up and returns 200 on the box, nginx
-   still serves the vhost, and there is a valid certificate — **expiring
-   2026-09-15**, which it *cannot* renew, because HTTP-01 validation needs the
-   name to resolve and it does not. `awakenfs.store` DNS is at Namecheap
-   (`dns1.registrar-servers.com`), not in the DigitalOcean account, so the fix
-   is a Namecheap A record → `165.22.246.45`. Do it before the cert lapses, or
-   retire the vhost and the cert together.
+1. ~~`med.awakenfs.store`~~ — **retired 2026-09-03.** The app (`medusa-web`) was
+   healthy on `127.0.0.1:20021` and the cert was valid, but no DNS record
+   existed, so nobody could reach it — and the cert could never renew, because
+   HTTP-01 needs the name to resolve. Removed on Samuel's instruction: nginx
+   vhost deleted, certificate deleted via `certbot delete`, container, image and
+   `/root/medusa` compose project removed. Everything was backed up first to
+   `/root/retired-med.awakenfs.store-<timestamp>/` on the 165 host. The apex
+   `awakenfs.store` is a *different* application (ports 9010/8010) and was
+   verified still serving 307 afterwards.
 
-   While checking that: **`www.awakenfs.store` points at a Namecheap parking
-   page**, not at this server, even though nginx has a `server_name
-   awakenfs.store www.awakenfs.store` block expecting to serve it. The apex is
-   fine. `www` is not deliberately monitored, because a parking page answers
-   `200` and would show green — reachability monitoring cannot tell "our app"
-   from "somebody's parking page" without a content check.
+   Note also that `www.awakenfs.store` points at a Namecheap parking page rather
+   than this server, despite nginx still having a `server_name awakenfs.store
+   www.awakenfs.store` block. It is deliberately not monitored: a parking page
+   answers `200` and would show green. Reachability monitoring cannot tell "our
+   app" from "somebody's parking page" without a content check.
 
 2. ~~`track.urbanfleetsg.com` — 404~~ — **this was a monitoring defect, not an
    outage.** The app (CDMS `web-tracking`) has exactly one route,
@@ -513,6 +513,23 @@ Recorded here because a monitoring board is also an audit:
    claim itself off two probes of the **public** address only. The lesson is
    the one already written down: name the vantage point, and say whether the
    path was measured or merely not tried.
+
+6. **`crm.bevorasg.com` — the application is DOWN, and this board said it was
+   up.** The vhost serves a static brochure page from `/var/www` for `/`, and
+   only proxies `^/(admin|login|api|_next)` to the app on `:3013`. Nothing has
+   been listening on 3013. Measured at the same instant, from outside:
+   `/` → **200**, `/login` → **502**.
+
+   This is the same class of defect as probing a shared IP, and it is the more
+   dangerous one: a reverse proxy that can answer *without its backend* will
+   keep a row green through a total application outage. The target now probes
+   `/login`. An audit of every vhost for this shape (static root + backend only
+   on sub-paths) found exactly one other, `back-end.store`, which is currently
+   healthy but was repointed to `/api/health` for the same reason.
+
+   **The general rule: probe a path that cannot be served without the thing you
+   are trying to monitor.** A 200 from nginx's filesystem is not evidence that
+   an application is alive.
 
 5. **Bevora Ops is already monitoring both hosts.** `bevora-agent.service` is
    active on `165` *and* `gadonghr-prod`, with an established connection to

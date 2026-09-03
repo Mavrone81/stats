@@ -73,18 +73,30 @@ BUILTIN_TARGETS = [
     #
     # But probing the IP with a Host header ALSO hides a dead name: nginx
     # answers the catch-all and the row stays green even when the hostname no
-    # longer resolves for anybody. Measured here -- med.awakenfs.store has no
-    # DNS record at all, and by-IP probing reported it up with a healthy 200.
+    # longer resolves for anybody. Measured on med.awakenfs.store, which had no
+    # DNS record at all while by-IP probing reported it up with a healthy 200
+    # and a valid cert. That vhost has since been retired (see README), but it
+    # is the reason every row below is probed by name rather than by address.
     # Resolving the name is part of what users depend on, so it is part of
     # the check.
     {"ip": "app.urbanfleetsg.com", "port": 443, "label": "urbanfleet app", "seg": "edge-165", "opts": {"m": "https", "host": "app.urbanfleetsg.com", "path": "/", "expect": [200, 307]}},
     {"ip": "app.vorkhive.com", "port": 443, "label": "vorkhive app", "seg": "edge-165", "opts": {"m": "https", "host": "app.vorkhive.com", "path": "/", "expect": [200, 307]}},
     {"ip": "awakenfs.store", "port": 443, "label": "awakenfs", "seg": "edge-165", "opts": {"m": "https", "host": "awakenfs.store", "path": "/", "expect": [200, 307]}},
-    {"ip": "back-end.store", "port": 443, "label": "back-end.store", "seg": "edge-165", "opts": {"m": "https", "host": "back-end.store", "path": "/", "expect": [200]}},
+    # Same shape as crm.bevorasg.com: static root, backend only under /api/.
+    # Currently healthy, but probing "/" would keep saying so after :4210 died,
+    # so it is probed where the backend actually answers.
+    {"ip": "back-end.store", "port": 443, "label": "back-end.store", "seg": "edge-165", "opts": {"m": "https", "host": "back-end.store", "path": "/api/health", "expect": [200]}},
     {"ip": "bill.bevorasg.com", "port": 443, "label": "bill (bevora)", "seg": "edge-165", "opts": {"m": "https", "host": "bill.bevorasg.com", "path": "/", "expect": [200]}},
     {"ip": "chachisoftware.store", "port": 443, "label": "chachi website", "seg": "edge-165", "opts": {"m": "https", "host": "chachisoftware.store", "path": "/", "expect": [200]}},
     {"ip": "court.chachisoftware.store", "port": 443, "label": "chachi court", "seg": "edge-165", "opts": {"m": "https", "host": "court.chachisoftware.store", "path": "/", "expect": [200]}},
-    {"ip": "crm.bevorasg.com", "port": 443, "label": "crm (bevora)", "seg": "edge-165", "opts": {"m": "https", "host": "crm.bevorasg.com", "path": "/", "expect": [200]}},
+    # Probed at /login, NOT "/". This vhost serves a STATIC brochure page from
+    # /var/www for "/" and only proxies ^/(admin|login|api|_next) to the app on
+    # :3013. Probing "/" therefore returns 200 off the filesystem and reports
+    # the site healthy while the application behind it is dead -- measured: "/"
+    # gave 200 and /login gave 502 at the same instant. A reverse proxy that
+    # can answer without the backend is the single most reliable way to build a
+    # monitoring board that lies.
+    {"ip": "crm.bevorasg.com", "port": 443, "label": "crm (bevora)", "seg": "edge-165", "opts": {"m": "https", "host": "crm.bevorasg.com", "path": "/login", "expect": [200, 302, 307]}},
     {"ip": "crm.urbanwerkzsg.com", "port": 443, "label": "crm (urbanwerkz)", "seg": "edge-165", "opts": {"m": "https", "host": "crm.urbanwerkzsg.com", "path": "/", "expect": [200, 307]}},
     {"ip": "dancestudio.chachisoftware.store", "port": 443, "label": "chachi dancestudio", "seg": "edge-165", "opts": {"m": "https", "host": "dancestudio.chachisoftware.store", "path": "/", "expect": [200]}},
     {"ip": "dine.chachisoftware.store", "port": 443, "label": "chachi dine", "seg": "edge-165", "opts": {"m": "https", "host": "dine.chachisoftware.store", "path": "/", "expect": [200]}},
@@ -113,7 +125,6 @@ BUILTIN_TARGETS = [
     {"ip": "vo.urbanwerkzsg.com", "port": 443, "label": "VirtualOffice", "seg": "edge-165", "opts": {"m": "https", "host": "vo.urbanwerkzsg.com", "path": "/", "expect": [200, 302]}},
     {"ip": "vorkhive.com", "port": 443, "label": "vorkhive www", "seg": "edge-165", "opts": {"m": "https", "host": "vorkhive.com", "path": "/", "expect": [200]}},
     {"ip": "www.bevorasg.com", "port": 443, "label": "bevorasg www", "seg": "edge-165", "opts": {"m": "https", "host": "www.bevorasg.com", "path": "/", "expect": [200]}},
-    {"ip": "med.awakenfs.store", "port": 443, "label": "med.awakenfs (DNS removed)", "seg": "edge-165", "opts": {"m": "https", "host": "med.awakenfs.store", "path": "/", "expect": [200]}},
 
     # -- segment: host-165 -- the box itself, not a vhost --------------------
     {"ip": "165.22.246.45", "port": 22, "label": "165 sshd", "seg": "host-165", "opts": {"m": "tcp"}},
