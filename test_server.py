@@ -816,11 +816,27 @@ class TestLiveAuthFlow(unittest.TestCase):
         self.assertIn(st, (400, 401, 404))
 
     def test_19_oversized_body_is_refused(self):
+        """Either a 413 or a dropped connection counts -- both are a refusal.
+
+        The server rejects an oversized body WITHOUT draining it and then closes
+        the connection, because leftover bytes would be parsed as the next
+        request line on a keep-alive connection. That means the client can lose
+        the socket while it is still writing, and never get to read a status.
+        Asserting only on the status code made this test fail intermittently
+        under load -- it was racing the server's own correct behaviour.
+
+        What must never happen is the payload being ACCEPTED, so that is what
+        is actually asserted."""
         _, _, tok = self.login("samuel", "a-properly-long-secret")
         big = json.dumps([{"ip": "10.0.0.1", "port": 80}] * 60000)
-        st, _, _ = self.req("POST", "/api/targets", big, cookie=tok,
-                            ctype="application/json")
+        self.assertGreater(len(big), server.MAX_POST, "payload must exceed the cap")
+        try:
+            st, _, _ = self.req("POST", "/api/targets", big, cookie=tok,
+                                ctype="application/json")
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return                      # connection dropped mid-send = refused
         self.assertIn(st, (400, 413))
+        self.assertNotEqual(st, 200, "an oversized target list was accepted")
 
     def test_20_probe_endpoint_refuses_hosts_not_on_the_target_list(self):
         """An authenticated arbitrary-connect endpoint is a port scanner with
@@ -928,3 +944,37 @@ class TestGroupingFields(unittest.TestCase):
         self.assertEqual(
             len({t["srv"] for t in server.BUILTIN_TARGETS}), 3,
             "the fleet is three machines; a fourth grouping means a typo")
+
+
+class TestBrandingOnAuthPages(unittest.TestCase):
+    """/login and /change are rendered from a Python template, not index.html,
+    so they missed the favicon and logo entirely -- and they are the first (and
+    for anyone without an account, only) page the tool ever shows."""
+
+    def test_login_page_carries_favicon_and_mark(self):
+        pg = server.login_page().decode()
+        self.assertIn('rel="icon"', pg)
+        self.assertIn('class="mark"', pg)
+
+    def test_change_page_carries_favicon_and_mark(self):
+        pg = server.change_page("someone").decode()
+        self.assertIn('rel="icon"', pg)
+        self.assertIn('class="mark"', pg)
+
+    def test_no_template_escaping_artifacts_leak(self):
+        """The template is %-formatted, so every literal % in the inlined SVG
+        and CSS must be doubled. A single missed one raises at render time; a
+        doubled one that should not be renders as a stray '%%' on the page."""
+        for pg in (server.login_page().decode(),
+                   server.change_page("x", err="bad", forced=True).decode()):
+            self.assertNotIn("%%", pg)
+            self.assertNotIn("%(", pg)
+
+    def test_error_text_is_escaped_not_injected(self):
+        pg = server.change_page("x", err="<script>alert(1)</script>").decode()
+        self.assertNotIn("<script>alert(1)</script>", pg)
+        self.assertIn("&lt;script&gt;", pg)
+
+    def test_username_is_escaped_in_the_change_form(self):
+        pg = server.change_page('" onload="x').decode()
+        self.assertNotIn('" onload="x', pg)

@@ -1021,9 +1021,12 @@ _BADPATH = re.compile(r"[\s\r\n]")
 
 _PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>%(title)s &middot; bevoraSG netmap</title><style>
+<title>%(title)s &middot; bevoraSG netmap</title>
+<link rel="icon" href="data:image/svg+xml,%%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%%3E%%3Crect width='32' height='32' rx='7' fill='%%230d1117'/%%3E%%3Cpath d='M9 22 L16 10 L23 19' fill='none' stroke='%%235b90ff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%%3E%%3Ccircle cx='16' cy='10' r='3.6' fill='%%233fb950'/%%3E%%3Ccircle cx='9' cy='22' r='3.1' fill='%%235b90ff'/%%3E%%3Ccircle cx='23' cy='19' r='3.1' fill='%%235b90ff'/%%3E%%3C/svg%%3E">
+<style>
 :root{--bg:#f6f7f9;--card:#fff;--fg:#12161c;--mut:#5a6675;--line:#dfe3e8;--acc:#2563eb;--bad:#b42318}
 @media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0d1117;--card:#161b22;--fg:#e6edf3;--mut:#8b949e;--line:#30363d;--acc:#4b8bff;--bad:#f85149}}
+.mark{display:block;margin:0 auto 14px}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;
 background:var(--bg);color:var(--fg);font:15px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:24px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px;width:100%%;max-width:400px}
@@ -1038,6 +1041,12 @@ border:0;border-radius:8px;background:var(--acc);color:#fff;cursor:pointer}
 background:color-mix(in srgb,var(--bad) 12%%,transparent);color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 35%%,transparent)}
 .note{margin-top:18px;font-size:12px;color:var(--mut)}
 </style></head><body><div class="card">
+<svg class="mark" viewBox="0 0 32 32" width="34" height="34" aria-hidden="true">
+<rect width="32" height="32" rx="7" fill="#0d1117"/>
+<path d="M9 22 L16 10 L23 19" fill="none" stroke="#5b90ff" stroke-width="2.2"
+      stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="16" cy="10" r="3.6" fill="#3fb950"/><circle cx="9" cy="22" r="3.1" fill="#5b90ff"/>
+<circle cx="23" cy="19" r="3.1" fill="#5b90ff"/></svg>
 <h1>%(title)s</h1><p class="sub">%(sub)s</p>%(body)s</div></body></html>"""
 
 
