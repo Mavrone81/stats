@@ -886,3 +886,45 @@ class TestInvertedTargets(unittest.TestCase):
 
     def test_normal_mode_is_unaffected(self):
         self.assertFalse(server.probe_tcp("127.0.0.1", 1, {})["up"])
+
+
+class TestGroupingFields(unittest.TestCase):
+    """`srv` and `co` drive the card board's server/company grouping. They were
+    being silently STRIPPED by validate_targets, which builds its output dict
+    field by field -- so a target could carry them, pass validation, and arrive
+    at the UI without them. Nothing would error; the board would just quietly
+    lump everything under one heading."""
+
+    def test_srv_and_co_survive_validation(self):
+        ts, errs = server.validate_targets([{
+            "ip": "10.0.0.1", "port": 443, "label": "x", "seg": "s",
+            "srv": "app-165 (165.22.246.45)", "co": "Bevora",
+            "opts": {"m": "https"}}])
+        self.assertEqual(errs, [])
+        self.assertEqual(ts[0]["srv"], "app-165 (165.22.246.45)")
+        self.assertEqual(ts[0]["co"], "Bevora")
+
+    def test_absent_grouping_fields_are_simply_absent(self):
+        """The UI derives a fallback, so validation must not invent one here --
+        two different defaults in two places is how they drift apart."""
+        ts, _ = server.validate_targets([{"ip": "10.0.0.1", "port": 80}])
+        self.assertNotIn("srv", ts[0])
+        self.assertNotIn("co", ts[0])
+
+    def test_grouping_fields_are_length_capped(self):
+        ts, _ = server.validate_targets([{"ip": "10.0.0.1", "port": 80,
+                                          "srv": "s" * 500, "co": "c" * 500}])
+        self.assertLessEqual(len(ts[0]["srv"]), 60)
+        self.assertLessEqual(len(ts[0]["co"]), 60)
+
+    def test_every_seeded_target_declares_both(self):
+        """A target without them lands in an 'unassigned' bucket on the board,
+        which is exactly the flat list the cards replaced."""
+        missing = [t["label"] for t in server.BUILTIN_TARGETS
+                   if not t.get("srv") or not t.get("co")]
+        self.assertEqual(missing, [])
+
+    def test_seed_covers_exactly_the_three_servers(self):
+        self.assertEqual(
+            len({t["srv"] for t in server.BUILTIN_TARGETS}), 3,
+            "the fleet is three machines; a fourth grouping means a typo")

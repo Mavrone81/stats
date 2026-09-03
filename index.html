@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>bevoraSG network map</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230d1117'/%3E%3Cpath d='M9 22 L16 10 L23 19' fill='none' stroke='%235b90ff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='10' r='3.6' fill='%233fb950'/%3E%3Ccircle cx='9' cy='22' r='3.1' fill='%235b90ff'/%3E%3Ccircle cx='23' cy='19' r='3.1' fill='%235b90ff'/%3E%3C/svg%3E">
 <style>
 /* Light is the base palette. Dark redefines ONLY the tokens, twice: once for
    the system preference and once for an explicit toggle, so neither can strand
@@ -30,6 +31,14 @@ body{margin:0;background:var(--bg);color:var(--fg);
   font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   -webkit-text-size-adjust:100%}
 a{color:var(--acc)}
+.logo{display:inline-flex;line-height:0;flex:none}
+.logo svg{display:block}
+.lg-bg{fill:#0d1117}
+.lg-ln{stroke:var(--acc)}
+.lg-a{fill:var(--up)}
+.lg-b{fill:var(--acc)}
+:root[data-theme=dark] .lg-bg{fill:#000}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .lg-bg{fill:#000}}
 header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
   padding:14px 20px;background:var(--card);border-bottom:1px solid var(--line)}
 h1{font-size:16px;margin:0;font-weight:650;letter-spacing:-.01em}
@@ -85,6 +94,51 @@ textarea{width:100%;min-height:340px;font:12px/1.5 ui-monospace,SFMono-Regular,M
   background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:11px}
 .msg{margin-top:10px;font-size:13px}
 .msg.ok{color:var(--up)} .msg.err{color:var(--bad)}
+/* Card board -------------------------------------------------------------
+   A 45-row table forces you to read every line to find the one that matters.
+   Cards group by server, then by company, so an outage is located before it
+   is read: which machine, whose product, which URL. */
+.secttl{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);
+  font-weight:650;margin:0 0 10px}
+.srvstrip{display:grid;gap:12px;margin-bottom:24px;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.srvcard{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--up);
+  border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+.srvcard.bad{border-left-color:var(--bad)}
+.srvcard.warn{border-left-color:var(--warnc)}
+.srvcard .nm{font-weight:650;font-size:14px}
+.srvcard .ip{font-size:11px;color:var(--mut);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  margin-top:1px}
+.srvcard .row{display:flex;align-items:baseline;gap:14px;margin-top:10px}
+.srvcard .big{font-size:24px;font-weight:680;font-variant-numeric:tabular-nums;line-height:1}
+.srvcard .big.ok{color:var(--up)} .srvcard .big.no{color:var(--bad)}
+.srvcard .cap{font-size:11px;color:var(--mut)}
+.srvbar{display:flex;height:5px;border-radius:3px;overflow:hidden;margin-top:11px;background:var(--line)}
+.srvbar i{display:block;height:100%}
+.srvbar i.u{background:var(--up)} .srvbar i.a{background:var(--warnc)} .srvbar i.d{background:var(--bad)}
+.srvblock{margin-bottom:26px}
+.srvblock > h3{font-size:15px;font-weight:650;margin:0 0 2px;
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.srvblock > .sub{font-size:11px;color:var(--mut);margin:0 0 14px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.grp{margin:0 0 16px}
+.grp h4{font-size:12px;font-weight:650;color:var(--mut);margin:0 0 8px;
+  text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:8px}
+.grp h4 .n{font-weight:500;text-transform:none;letter-spacing:0;font-size:11px}
+.cards{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(268px,1fr))}
+.svc{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--up);
+  border-radius:10px;padding:11px 13px;box-shadow:var(--shadow);min-width:0}
+.svc.down{border-left-color:var(--bad)}
+.svc.ack{border-left-color:var(--warnc)}
+.svc .top{display:flex;align-items:flex-start;gap:8px;justify-content:space-between}
+.svc .nm{font-weight:600;font-size:13.5px;line-height:1.3;min-width:0;overflow-wrap:anywhere}
+.svc .url{font-size:11px;color:var(--mut);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  margin-top:3px;overflow-wrap:anywhere}
+.svc .meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:11px;color:var(--mut);
+  font-variant-numeric:tabular-nums;align-items:center}
+.svc .det{font-size:11px;color:var(--mut);margin-top:6px;overflow-wrap:anywhere}
+.svc .det.bad{color:var(--bad);font-weight:600}
+.svc button.act{margin-top:9px;font-size:11px;min-height:28px;padding:3px 9px}
 /* Simple view */
 .simple h3{font-size:15px;margin:0 0 6px}
 .simple p{margin:0 0 10px;max-width:68ch;color:var(--fg)}
@@ -116,6 +170,14 @@ svg{display:block;min-width:660px;max-width:100%;height:auto}
 </head>
 <body>
 <header>
+  <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32" width="26" height="26">
+    <rect width="32" height="32" rx="7" class="lg-bg"/>
+    <path d="M9 22 L16 10 L23 19" fill="none" class="lg-ln"
+          stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="16" cy="10" r="3.6" class="lg-a"/>
+    <circle cx="9"  cy="22" r="3.1" class="lg-b"/>
+    <circle cx="23" cy="19" r="3.1" class="lg-b"/>
+  </svg></span>
   <h1>bevoraSG network map</h1>
   <span class="grow"></span>
   <span class="meta" id="meta">loading…</span>
@@ -152,12 +214,9 @@ svg{display:block;min-width:660px;max-width:100%;height:auto}
   </section>
 
   <section id="board" hidden>
-    <div class="card"><h2>Live status</h2>
-      <div class="tw"><table>
-        <thead><tr><th>Service</th><th>Segment</th><th>Endpoint</th><th>State</th>
-          <th class="num">ms</th><th class="num">Cert</th><th>Detail</th><th></th></tr></thead>
-        <tbody id="rows"></tbody></table></div>
-    </div>
+    <h2 class="secttl">Servers</h2>
+    <div class="srvstrip" id="srvstrip"></div>
+    <div id="groups"></div>
   </section>
 
   <section id="incidents" hidden>
@@ -252,28 +311,108 @@ function renderBoard(d){
     + 'and availability are not being recorded. Live reachability below is '
     + 'unaffected — that is deliberate: storage failure must never take the '
     + 'board down.</div>';
-  $("#rows").innerHTML = d.hosts.map(r => `<tr>
-    <td><strong>${esc(r.label)}</strong>${r.pending
-        ? ' <span class="pill pending">confirming…</span>' : ""}</td>
-    <td class="seg">${esc(r.seg)}</td>
-    <td class="seg">${ep(r)}</td>
-    <td>${statePill(r)}${r.ack_note ? ' <span class="seg">'+esc(r.ack_note)+'</span>' : ""}</td>
-    <td class="num">${r.ms ?? "—"}</td>
-    <td class="num">${r.cert_days == null ? "—"
-        : r.cert_days < 0 ? '<span class="pill down">expired</span>'
-        : r.cert_days <= 21 ? '<span class="pill ack">'+r.cert_days+'d</span>'
-        : r.cert_days + "d"}</td>
-    <td class="seg">${esc(r.detail)}</td>
-    <td><button class="act" data-ip="${esc(r.ip)}" data-port="${r.port}"
-        data-key="${esc(r.ip)}:${r.port}">Probe</button></td></tr>`).join("");
-  $("#rows").querySelectorAll("button").forEach(b => b.onclick = async () => {
-    b.textContent = "…";
-    const r = await api(`/api/probe?ip=${encodeURIComponent(b.dataset.ip)}&port=${b.dataset.port}`);
-    b.textContent = r.body.raw ? (r.body.raw.up ? "up now" : "down now") : "error";
-    setTimeout(() => b.textContent = "Probe", 4000);
-  });
+  renderServerStrip(d);
+  renderGroups(d);
   renderSimple(d);
   renderTopo(d);
+}
+
+/* Server strip: one card per machine, the whole fleet in one glance ------ */
+function renderServerStrip(d){
+  const by = {};
+  d.hosts.forEach(r => {
+    const k = r.srv || r.seg || "unassigned";
+    const s = by[k] = by[k] || {up:0, acked:0, down:0, n:0};
+    s.n++;
+    if (r.up) s.up++; else if (r.ack) s.acked++; else s.down++;
+  });
+  const order = Object.keys(by).sort();
+  $("#srvstrip").innerHTML = order.map(k => {
+    const s = by[k];
+    const m = k.match(/^(.*?)\s*\(([^)]+)\)\s*$/);   // "name (ip)"
+    const name = m ? m[1] : k, ip = m ? m[2] : "";
+    const cls = s.down ? "bad" : s.acked ? "warn" : "";
+    const pc = v => (100 * v / Math.max(1, s.n)).toFixed(2) + "%";
+    return `<div class="srvcard ${cls}">
+      <div class="nm">${esc(name)}</div>
+      ${ip ? `<div class="ip">${esc(ip)}</div>` : ""}
+      <div class="row">
+        <span class="big ${s.down ? "no" : "ok"}">${s.down ? s.down : s.up}</span>
+        <span class="cap">${s.down ? `not answering, of ${s.n}`
+                                   : `of ${s.n} answering`}</span>
+      </div>
+      <div class="srvbar" role="img" aria-label="${s.up} up, ${s.acked} acknowledged, ${s.down} down">
+        <i class="u" style="width:${pc(s.up)}"></i>
+        <i class="a" style="width:${pc(s.acked)}"></i>
+        <i class="d" style="width:${pc(s.down)}"></i>
+      </div></div>`;
+  }).join("");
+}
+
+/* Grouped cards: server -> company -> service --------------------------- */
+function company(r){
+  if (r.co) return r.co;
+  const h = (r.opts && r.opts.host) || r.ip || "";
+  if (/^[\d.]+$/.test(h)) return "Infrastructure";
+  const p = h.split(".");
+  return p.length > 2 ? p.slice(-3).join(".") : h;   // rough registrable domain
+}
+function svcUrl(r){
+  const h = (r.opts && r.opts.host);
+  if (!h) return `${r.ip}:${r.port}`;
+  const path = (r.opts.path && r.opts.path !== "/") ? r.opts.path : "";
+  return `${r.port === 443 ? "https" : "http"}://${h}${path}`;
+}
+function renderGroups(d){
+  const tree = {};
+  d.hosts.forEach(r => {
+    const sv = r.srv || r.seg || "unassigned", co = company(r);
+    ((tree[sv] = tree[sv] || {})[co] = tree[sv][co] || []).push(r);
+  });
+  $("#groups").innerHTML = Object.keys(tree).sort().map(sv => {
+    const m = sv.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+    const cos = tree[sv];
+    const total = Object.values(cos).reduce((a, v) => a + v.length, 0);
+    const down = Object.values(cos).flat().filter(r => !r.up && !r.ack).length;
+    return `<div class="srvblock">
+      <h3>${esc(m ? m[1] : sv)}
+        ${down ? `<span class="pill down">${down} down</span>`
+               : `<span class="pill up">all ${total} ok</span>`}</h3>
+      ${m ? `<p class="sub">${esc(m[2])}</p>` : ""}
+      ${Object.keys(cos).sort().map(co => `<div class="grp">
+          <h4>${esc(co)} <span class="n">${cos[co].length}</span></h4>
+          <div class="cards">${cos[co].map(svcCard).join("")}</div>
+        </div>`).join("")}
+    </div>`;
+  }).join("");
+  $("#groups").querySelectorAll("button[data-ip]").forEach(b => b.onclick = async () => {
+    const t = b.textContent; b.textContent = "…";
+    const r = await api(`/api/probe?ip=${encodeURIComponent(b.dataset.ip)}&port=${b.dataset.port}`);
+    b.textContent = r.body.raw ? (r.body.raw.up ? "up now" : "down now") : "error";
+    setTimeout(() => b.textContent = t, 4000);
+  });
+}
+function svcCard(r){
+  const state = (!r.up && !r.ack) ? "down" : r.ack ? "ack" : "";
+  const badDetail = !r.up && !r.ack;
+  return `<div class="svc ${state}">
+    <div class="top">
+      <div style="min-width:0">
+        <div class="nm">${esc(r.label)}</div>
+        <div class="url">${esc(svcUrl(r))}</div>
+      </div>
+      ${statePill(r)}
+    </div>
+    <div class="meta">
+      ${r.ms != null ? `<span>${r.ms} ms</span>` : ""}
+      ${r.cert_days != null ? `<span>cert ${r.cert_days < 0
+          ? "EXPIRED" : r.cert_days + "d"}</span>` : ""}
+      ${r.pending ? '<span class="pill pending">confirming…</span>' : ""}
+    </div>
+    <div class="det ${badDetail ? "bad" : ""}">${esc(r.detail)}</div>
+    ${r.ack_note ? `<div class="det">${esc(r.ack_note)}</div>` : ""}
+    <button class="act" data-ip="${esc(r.ip)}" data-port="${r.port}">Probe</button>
+  </div>`;
 }
 
 function renderOverview(o){

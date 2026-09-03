@@ -79,16 +79,16 @@ BUILTIN_TARGETS = [
     # is the reason every row below is probed by name rather than by address.
     # Resolving the name is part of what users depend on, so it is part of
     # the check.
-    {"ip": "app.urbanfleetsg.com", "port": 443, "label": "urbanfleet app", "seg": "edge-165", "opts": {"m": "https", "host": "app.urbanfleetsg.com", "path": "/", "expect": [200, 307]}},
-    {"ip": "app.vorkhive.com", "port": 443, "label": "vorkhive app", "seg": "edge-165", "opts": {"m": "https", "host": "app.vorkhive.com", "path": "/", "expect": [200, 307]}},
-    {"ip": "awakenfs.store", "port": 443, "label": "awakenfs", "seg": "edge-165", "opts": {"m": "https", "host": "awakenfs.store", "path": "/", "expect": [200, 307]}},
+    {"ip": "app.urbanfleetsg.com", "port": 443, "label": "urbanfleet app", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Urban Fleet", "opts": {"m": "https", "host": "app.urbanfleetsg.com", "path": "/", "expect": [200, 307]}},
+    {"ip": "app.vorkhive.com", "port": 443, "label": "vorkhive app", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Vorkhive", "opts": {"m": "https", "host": "app.vorkhive.com", "path": "/", "expect": [200, 307]}},
+    {"ip": "awakenfs.store", "port": 443, "label": "awakenfs", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "AwakenFS", "opts": {"m": "https", "host": "awakenfs.store", "path": "/", "expect": [200, 307]}},
     # Same shape as crm.bevorasg.com: static root, backend only under /api/.
     # Currently healthy, but probing "/" would keep saying so after :4210 died,
     # so it is probed where the backend actually answers.
-    {"ip": "back-end.store", "port": 443, "label": "back-end.store", "seg": "edge-165", "opts": {"m": "https", "host": "back-end.store", "path": "/api/health", "expect": [200]}},
-    {"ip": "bill.bevorasg.com", "port": 443, "label": "bill (bevora)", "seg": "edge-165", "opts": {"m": "https", "host": "bill.bevorasg.com", "path": "/", "expect": [200]}},
-    {"ip": "chachisoftware.store", "port": 443, "label": "chachi website", "seg": "edge-165", "opts": {"m": "https", "host": "chachisoftware.store", "path": "/", "expect": [200]}},
-    {"ip": "court.chachisoftware.store", "port": 443, "label": "chachi court", "seg": "edge-165", "opts": {"m": "https", "host": "court.chachisoftware.store", "path": "/", "expect": [200]}},
+    {"ip": "back-end.store", "port": 443, "label": "back-end.store", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Back-End Store", "opts": {"m": "https", "host": "back-end.store", "path": "/api/health", "expect": [200]}},
+    {"ip": "bill.bevorasg.com", "port": 443, "label": "bill (bevora)", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Bevora", "opts": {"m": "https", "host": "bill.bevorasg.com", "path": "/", "expect": [200]}},
+    {"ip": "chachisoftware.store", "port": 443, "label": "chachi website", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Chachi", "opts": {"m": "https", "host": "chachisoftware.store", "path": "/", "expect": [200]}},
+    {"ip": "court.chachisoftware.store", "port": 443, "label": "chachi court", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Chachi", "opts": {"m": "https", "host": "court.chachisoftware.store", "path": "/", "expect": [200]}},
     # Probed at /login, NOT "/". This vhost serves a STATIC brochure page from
     # /var/www for "/" and only proxies ^/(admin|login|api|_next) to the app on
     # :3013. Probing "/" therefore returns 200 off the filesystem and reports
@@ -96,38 +96,38 @@ BUILTIN_TARGETS = [
     # gave 200 and /login gave 502 at the same instant. A reverse proxy that
     # can answer without the backend is the single most reliable way to build a
     # monitoring board that lies.
-    {"ip": "crm.bevorasg.com", "port": 443, "label": "crm (bevora)", "seg": "edge-165", "opts": {"m": "https", "host": "crm.bevorasg.com", "path": "/login", "expect": [200, 302, 307]}},
-    {"ip": "crm.urbanwerkzsg.com", "port": 443, "label": "crm (urbanwerkz)", "seg": "edge-165", "opts": {"m": "https", "host": "crm.urbanwerkzsg.com", "path": "/", "expect": [200, 307]}},
-    {"ip": "dancestudio.chachisoftware.store", "port": 443, "label": "chachi dancestudio", "seg": "edge-165", "opts": {"m": "https", "host": "dancestudio.chachisoftware.store", "path": "/", "expect": [200]}},
-    {"ip": "dine.chachisoftware.store", "port": 443, "label": "chachi dine", "seg": "edge-165", "opts": {"m": "https", "host": "dine.chachisoftware.store", "path": "/", "expect": [200]}},
-    {"ip": "eform.bevorasg.com", "port": 443, "label": "eform (bevora)", "seg": "edge-165", "opts": {"m": "https", "host": "eform.bevorasg.com", "path": "/", "expect": [200]}},
-    {"ip": "enshrinepets.com.sg", "port": 443, "label": "enshrine pets", "seg": "edge-165", "opts": {"m": "https", "host": "enshrinepets.com.sg", "path": "/", "expect": [200]}},
-    {"ip": "form.bevorasg.com", "port": 443, "label": "bamform", "seg": "edge-165", "opts": {"m": "https", "host": "form.bevorasg.com", "path": "/", "expect": [200]}},
-    {"ip": "hris.chachisoftware.store", "port": 443, "label": "chachi hris", "seg": "edge-165", "opts": {"m": "https", "host": "hris.chachisoftware.store", "path": "/", "expect": [200]}},
-    {"ip": "huayutong.urbanwerkzsg.com", "port": 443, "label": "huayutong", "seg": "edge-165", "opts": {"m": "https", "host": "huayutong.urbanwerkzsg.com", "path": "/", "expect": [200]}},
-    {"ip": "ims.bevorasg.com", "port": 443, "label": "ims (bevora)", "seg": "edge-165", "opts": {"m": "https", "host": "ims.bevorasg.com", "path": "/", "expect": [200]}},
-    {"ip": "jobs.chachisoftware.store", "port": 443, "label": "jobstuff", "seg": "edge-165", "opts": {"m": "https", "host": "jobs.chachisoftware.store", "path": "/", "expect": [200]}},
-    {"ip": "lng.bevorasg.com", "port": 443, "label": "lng (bevora)", "seg": "edge-165", "opts": {"m": "https", "host": "lng.bevorasg.com", "path": "/", "expect": [200]}},
-    {"ip": "loan.chachisoftware.store", "port": 443, "label": "chachi loan demo", "seg": "edge-165", "opts": {"m": "https", "host": "loan.chachisoftware.store", "path": "/", "expect": [200]}},
-    {"ip": "mcts.urbanwerkzsg.com", "port": 443, "label": "housecharging / mcts", "seg": "edge-165", "opts": {"m": "https", "host": "mcts.urbanwerkzsg.com", "path": "/", "expect": [200]}},
-    {"ip": "sign.bevorasg.com", "port": 443, "label": "bevorasign", "seg": "edge-165", "opts": {"m": "https", "host": "sign.bevorasg.com", "path": "/", "expect": [200, 302]}},
-    {"ip": "singaporebuddhistfuneral.com.sg", "port": 443, "label": "sbf funeral", "seg": "edge-165", "opts": {"m": "https", "host": "singaporebuddhistfuneral.com.sg", "path": "/", "expect": [200]}},
+    {"ip": "crm.bevorasg.com", "port": 443, "label": "crm (bevora)", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Bevora", "opts": {"m": "https", "host": "crm.bevorasg.com", "path": "/login", "expect": [200, 302, 307]}},
+    {"ip": "crm.urbanwerkzsg.com", "port": 443, "label": "crm (urbanwerkz)", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Urbanwerkz", "opts": {"m": "https", "host": "crm.urbanwerkzsg.com", "path": "/", "expect": [200, 307]}},
+    {"ip": "dancestudio.chachisoftware.store", "port": 443, "label": "chachi dancestudio", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Chachi", "opts": {"m": "https", "host": "dancestudio.chachisoftware.store", "path": "/", "expect": [200]}},
+    {"ip": "dine.chachisoftware.store", "port": 443, "label": "chachi dine", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Chachi", "opts": {"m": "https", "host": "dine.chachisoftware.store", "path": "/", "expect": [200]}},
+    {"ip": "eform.bevorasg.com", "port": 443, "label": "eform (bevora)", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Bevora", "opts": {"m": "https", "host": "eform.bevorasg.com", "path": "/", "expect": [200]}},
+    {"ip": "enshrinepets.com.sg", "port": 443, "label": "enshrine pets", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Enshrine Pets", "opts": {"m": "https", "host": "enshrinepets.com.sg", "path": "/", "expect": [200]}},
+    {"ip": "form.bevorasg.com", "port": 443, "label": "bamform", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Bevora", "opts": {"m": "https", "host": "form.bevorasg.com", "path": "/", "expect": [200]}},
+    {"ip": "hris.chachisoftware.store", "port": 443, "label": "chachi hris", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Chachi", "opts": {"m": "https", "host": "hris.chachisoftware.store", "path": "/", "expect": [200]}},
+    {"ip": "huayutong.urbanwerkzsg.com", "port": 443, "label": "huayutong", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Urbanwerkz", "opts": {"m": "https", "host": "huayutong.urbanwerkzsg.com", "path": "/", "expect": [200]}},
+    {"ip": "ims.bevorasg.com", "port": 443, "label": "ims (bevora)", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Bevora", "opts": {"m": "https", "host": "ims.bevorasg.com", "path": "/", "expect": [200]}},
+    {"ip": "jobs.chachisoftware.store", "port": 443, "label": "jobstuff", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Chachi", "opts": {"m": "https", "host": "jobs.chachisoftware.store", "path": "/", "expect": [200]}},
+    {"ip": "lng.bevorasg.com", "port": 443, "label": "lng (bevora)", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Bevora", "opts": {"m": "https", "host": "lng.bevorasg.com", "path": "/", "expect": [200]}},
+    {"ip": "loan.chachisoftware.store", "port": 443, "label": "chachi loan demo", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Chachi", "opts": {"m": "https", "host": "loan.chachisoftware.store", "path": "/", "expect": [200]}},
+    {"ip": "mcts.urbanwerkzsg.com", "port": 443, "label": "housecharging / mcts", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Urbanwerkz", "opts": {"m": "https", "host": "mcts.urbanwerkzsg.com", "path": "/", "expect": [200]}},
+    {"ip": "sign.bevorasg.com", "port": 443, "label": "bevorasign", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Bevora", "opts": {"m": "https", "host": "sign.bevorasg.com", "path": "/", "expect": [200, 302]}},
+    {"ip": "singaporebuddhistfuneral.com.sg", "port": 443, "label": "sbf funeral", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Singapore Buddhist Funeral", "opts": {"m": "https", "host": "singaporebuddhistfuneral.com.sg", "path": "/", "expect": [200]}},
     # Probed at /track/<anything>, NOT at "/". This app (CDMS web-tracking) has
     # exactly one route -- app/track/[trackingId] -- and no root page, so "/"
     # returns a perfectly correct 404. Probing "/" reported a healthy app as
     # broken for as long as it was configured that way. The lesson generalises:
     # before filing a 404 as a fault, check whether the app was ever supposed
     # to serve that path.
-    {"ip": "track.urbanfleetsg.com", "port": 443, "label": "urbanfleet track", "seg": "edge-165", "opts": {"m": "https", "host": "track.urbanfleetsg.com", "path": "/track/netmap-probe", "expect": [200]}},
-    {"ip": "uat.bevorasg.com", "port": 443, "label": "uat (bevora)", "seg": "edge-165", "opts": {"m": "https", "host": "uat.bevorasg.com", "path": "/", "expect": [200]}},
-    {"ip": "urbanfleetsg.com", "port": 443, "label": "urbanfleet www", "seg": "edge-165", "opts": {"m": "https", "host": "urbanfleetsg.com", "path": "/", "expect": [200]}},
-    {"ip": "urbanwerkzsg.com", "port": 443, "label": "urbanwerkz www", "seg": "edge-165", "opts": {"m": "https", "host": "urbanwerkzsg.com", "path": "/", "expect": [200]}},
-    {"ip": "vo.urbanwerkzsg.com", "port": 443, "label": "VirtualOffice", "seg": "edge-165", "opts": {"m": "https", "host": "vo.urbanwerkzsg.com", "path": "/", "expect": [200, 302]}},
-    {"ip": "vorkhive.com", "port": 443, "label": "vorkhive www", "seg": "edge-165", "opts": {"m": "https", "host": "vorkhive.com", "path": "/", "expect": [200]}},
-    {"ip": "www.bevorasg.com", "port": 443, "label": "bevorasg www", "seg": "edge-165", "opts": {"m": "https", "host": "www.bevorasg.com", "path": "/", "expect": [200]}},
+    {"ip": "track.urbanfleetsg.com", "port": 443, "label": "urbanfleet track", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Urban Fleet", "opts": {"m": "https", "host": "track.urbanfleetsg.com", "path": "/track/netmap-probe", "expect": [200]}},
+    {"ip": "uat.bevorasg.com", "port": 443, "label": "uat (bevora)", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Bevora", "opts": {"m": "https", "host": "uat.bevorasg.com", "path": "/", "expect": [200]}},
+    {"ip": "urbanfleetsg.com", "port": 443, "label": "urbanfleet www", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Urban Fleet", "opts": {"m": "https", "host": "urbanfleetsg.com", "path": "/", "expect": [200]}},
+    {"ip": "urbanwerkzsg.com", "port": 443, "label": "urbanwerkz www", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Urbanwerkz", "opts": {"m": "https", "host": "urbanwerkzsg.com", "path": "/", "expect": [200]}},
+    {"ip": "vo.urbanwerkzsg.com", "port": 443, "label": "VirtualOffice", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Urbanwerkz", "opts": {"m": "https", "host": "vo.urbanwerkzsg.com", "path": "/", "expect": [200, 302]}},
+    {"ip": "vorkhive.com", "port": 443, "label": "vorkhive www", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Vorkhive", "opts": {"m": "https", "host": "vorkhive.com", "path": "/", "expect": [200]}},
+    {"ip": "www.bevorasg.com", "port": 443, "label": "bevorasg www", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Bevora", "opts": {"m": "https", "host": "www.bevorasg.com", "path": "/", "expect": [200]}},
 
     # -- segment: host-165 -- the box itself, not a vhost --------------------
-    {"ip": "165.22.246.45", "port": 22, "label": "165 sshd", "seg": "host-165", "opts": {"m": "tcp"}},
+    {"ip": "165.22.246.45", "port": 22, "label": "165 sshd", "seg": "host-165", "srv": "app-165 (165.22.246.45)", "co": "Infrastructure", "opts": {"m": "tcp"}},
     # MEASURED, not assumed: both of these bind 0.0.0.0 on the host, so `ss`
     # reports them world-listening -- but neither answers from off-box. What
     # actually closes them is the host's OWN ufw (default-deny INPUT, allowing
@@ -136,8 +136,8 @@ BUILTIN_TARGETS = [
     # published ports from punching straight through ufw, which is otherwise
     # exactly what they do. There is NO cloud firewall on this droplet at all.
     # Probed INVERTED, so these rows go red if either protection is dropped.
-    {"ip": "165.22.246.45", "port": 5432, "label": "165 postgres (must stay closed)", "seg": "host-165", "opts": {"m": "tcp", "invert": True}},
-    {"ip": "165.22.246.45", "port": 6379, "label": "165 redis (must stay closed)", "seg": "host-165", "opts": {"m": "tcp", "invert": True}},
+    {"ip": "165.22.246.45", "port": 5432, "label": "165 postgres (must stay closed)", "seg": "host-165", "srv": "app-165 (165.22.246.45)", "co": "Infrastructure", "opts": {"m": "tcp", "invert": True}},
+    {"ip": "165.22.246.45", "port": 6379, "label": "165 redis (must stay closed)", "seg": "host-165", "srv": "app-165 (165.22.246.45)", "co": "Infrastructure", "opts": {"m": "tcp", "invert": True}},
 
     # -- segment: gadonghr -- ONE hostname, PATH-based routing via Traefik ---
     #
@@ -147,15 +147,15 @@ BUILTIN_TARGETS = [
     # 401/404 count as UP: these are unauthenticated probes of authenticated
     # APIs, and a service that refuses us is a service that is running. Only
     # 5xx or no answer means the backend is gone.
-    {"ip": "hr.bevorasg.com", "port": 443, "label": "gadonghr web", "seg": "gadonghr", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/", "expect": [200]}},
-    {"ip": "hr.bevorasg.com", "port": 443, "label": "keycloak auth", "seg": "gadonghr", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/auth/", "expect": [200, 302, 303]}},
-    {"ip": "hr.bevorasg.com", "port": 443, "label": "svc-config", "seg": "gadonghr", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/api/config", "expect": [200, 401, 404]}},
-    {"ip": "hr.bevorasg.com", "port": 443, "label": "svc-authz", "seg": "gadonghr", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/api/authz", "expect": [200, 401, 404]}},
-    {"ip": "hr.bevorasg.com", "port": 443, "label": "svc-audit", "seg": "gadonghr", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/api/audit", "expect": [200, 401, 404]}},
-    {"ip": "hr.bevorasg.com", "port": 443, "label": "svc-i18n", "seg": "gadonghr", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/api/i18n", "expect": [200, 401, 404]}},
-    {"ip": "hr.bevorasg.com", "port": 443, "label": "svc-notify", "seg": "gadonghr", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/api/notify", "expect": [200, 401, 404]}},
-    {"ip": "hr.bevorasg.com", "port": 443, "label": "svc-docs", "seg": "gadonghr", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/api/docs", "expect": [200, 401, 404]}},
-    {"ip": "157.230.38.96", "port": 22, "label": "gadonghr sshd", "seg": "gadonghr", "opts": {"m": "tcp"}},
+    {"ip": "hr.bevorasg.com", "port": 443, "label": "gadonghr web", "seg": "gadonghr", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/", "expect": [200]}},
+    {"ip": "hr.bevorasg.com", "port": 443, "label": "keycloak auth", "seg": "gadonghr", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/auth/", "expect": [200, 302, 303]}},
+    {"ip": "hr.bevorasg.com", "port": 443, "label": "svc-config", "seg": "gadonghr", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/api/config", "expect": [200, 401, 404]}},
+    {"ip": "hr.bevorasg.com", "port": 443, "label": "svc-authz", "seg": "gadonghr", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/api/authz", "expect": [200, 401, 404]}},
+    {"ip": "hr.bevorasg.com", "port": 443, "label": "svc-audit", "seg": "gadonghr", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/api/audit", "expect": [200, 401, 404]}},
+    {"ip": "hr.bevorasg.com", "port": 443, "label": "svc-i18n", "seg": "gadonghr", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/api/i18n", "expect": [200, 401, 404]}},
+    {"ip": "hr.bevorasg.com", "port": 443, "label": "svc-notify", "seg": "gadonghr", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/api/notify", "expect": [200, 401, 404]}},
+    {"ip": "hr.bevorasg.com", "port": 443, "label": "svc-docs", "seg": "gadonghr", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/api/docs", "expect": [200, 401, 404]}},
+    {"ip": "157.230.38.96", "port": 22, "label": "gadonghr sshd", "seg": "gadonghr", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "tcp"}},
 
     # -- segment: bevora-ops -------------------------------------------------
     # Publicly filtered on every port tried. NOT unrouted, though: all three
@@ -165,7 +165,7 @@ BUILTIN_TARGETS = [
     # shared private network, not an absence of route -- a distinction this
     # file cared enough about to lecture on in the Simple View, and then got
     # wrong by only testing the public address. Both facts are probed below.
-    {"ip": "157.245.152.227", "port": 22, "label": "bevora-ops sshd (public, filtered)", "seg": "bevora-ops", "opts": {"m": "tcp"}},
+    {"ip": "157.245.152.227", "port": 22, "label": "bevora-ops sshd (public, filtered)", "seg": "bevora-ops", "srv": "bevora-ops (157.245.152.227)", "co": "Infrastructure", "opts": {"m": "tcp"}},
     # The VPC ingest port Bevora Ops' own agents push into -- the one port
     # permitted across the private network. PUSH mode, not tcp: a prober
     # outside the VPC structurally cannot see this, and probing it from outside
@@ -178,7 +178,7 @@ BUILTIN_TARGETS = [
     # honest state: nobody is currently measuring the private path. Do not
     # "fix" it by switching to tcp; fix it by homing the agent, or delete the
     # target and say so in the README.
-    {"ip": "10.104.0.3", "port": 4100, "label": "bevora-ops ingest (VPC, needs on-VPC agent)", "seg": "bevora-ops", "opts": {"m": "push"}},
+    {"ip": "10.104.0.3", "port": 4100, "label": "bevora-ops ingest (VPC, needs on-VPC agent)", "seg": "bevora-ops", "srv": "bevora-ops (157.245.152.227)", "co": "Infrastructure", "opts": {"m": "push"}},
 ]
 
 
@@ -247,12 +247,22 @@ def validate_targets(raw):
         if exp is not None and (not isinstance(exp, list)
                                 or not all(isinstance(c, int) for c in exp)):
             errs.append(f"[{i}] expect must be a list of ints"); continue
-        out.append({
+        rec = {
             "ip": ip, "port": port,
             "label": str(t.get("label", "") or f"{ip}:{port}")[:120],
             "seg": str(t.get("seg", "") or "unsegmented")[:60],
             "opts": opts,
-        })
+        }
+        # Optional grouping dimensions for the board. Both are OPTIONAL and
+        # carried through verbatim rather than defaulted here: the UI derives
+        # a sensible fallback (company from the registrable domain, server from
+        # the segment), so a target added through the editor groups correctly
+        # without anyone having to know these fields exist.
+        for k in ("srv", "co"):
+            v = t.get(k)
+            if v:
+                rec[k] = str(v)[:60]
+        out.append(rec)
     if errs:
         return None, errs
     return out, []
