@@ -4,41 +4,52 @@
 # A test that passes against code where the feature is UNWIRED is not a test.
 # The recurring defect in this estate is not a wrong check -- it is a check that
 # was never in force: configured, healthy-looking, exit 0, testing nothing.
-# Bevora Ops found four of its own verification scripts in exactly that state.
+# So this script deliberately BREAKS each guard, runs the suite against the
+# broken code, and requires the suite to FAIL.
 #
-# So this script deliberately BREAKS each guard, runs the suite, and requires it
-# to FAIL. If the suite still passes with the guard removed, that guard is
-# unverified and this script exits non-zero.
+# IT NEVER TOUCHES THE WORKING TREE. Each case is run against a COPY in a temp
+# directory; server.py in the repo is only ever read.
 #
-# It restores every file afterwards, including on failure, via the trap below.
+# That is not fastidiousness -- an earlier version sabotaged the real file and
+# restored it from a trap, and an outer `timeout` killed it mid-run while bash
+# was blocked on the test subprocess. The trap did not win the race, and the
+# repo was left with `invert = False` in server.py. Only `git status` caught it.
+# A script that leaves a silently-disarmed guard behind when interrupted is a
+# strictly worse problem than the one it was written to detect, so the fix is
+# structural: there is no window in which a sabotaged file exists under the
+# repo, and therefore no trap to get right.
 set -uo pipefail
 cd "$(dirname "$0")/.."
+REPO="$PWD"
 
-BACKUP=$(mktemp -d)
-cp server.py "$BACKUP/server.py"
-restore() { cp "$BACKUP/server.py" server.py; rm -rf "$BACKUP"; }
-trap restore EXIT INT TERM
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT INT TERM     # only ever deletes a temp dir
 
 fail=0
 
-# Each case: a name, the exact line to break, and its replacement.
 run_case () {
   local name="$1" old="$2" new="$3"
-  cp "$BACKUP/server.py" server.py
-  if ! grep -qF -- "$old" server.py; then
-    echo "  !! $name: anchor line not found -- this script is stale and is"
-    echo "     no longer breaking anything. That is the same silent-no-op"
-    echo "     failure it exists to catch, so it counts as a failure."
+  local dir="$WORK/case"
+  rm -rf "$dir"; mkdir -p "$dir"
+  cp "$REPO/server.py" "$REPO/test_server.py" "$dir/"
+
+  if ! grep -qF -- "$old" "$dir/server.py"; then
+    echo "  !! $name: anchor line not found -- this script is stale and is no"
+    echo "     longer breaking anything. A guard-checker that silently matches"
+    echo "     nothing is the same failure it exists to catch, so: FAIL."
     fail=1; return
   fi
-  python3 - "$old" "$new" <<'PY'
+
+  python3 - "$dir/server.py" "$old" "$new" <<'PY'
 import sys
-old, new = sys.argv[1], sys.argv[2]
-s = open("server.py").read()
-open("server.py", "w").write(s.replace(old, new, 1))
+path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+s = open(path).read()
+open(path, "w").write(s.replace(old, new, 1))
 PY
-  # The suite MUST fail now. NETMAP_DATA is a scratch dir; no network needed.
-  if NETMAP_DATA=$(mktemp -d) python3 -m unittest test_server >/dev/null 2>&1; then
+
+  # The suite MUST fail against the sabotaged copy.
+  if (cd "$dir" && NETMAP_DATA="$dir/data" python3 -m unittest test_server) \
+       >/dev/null 2>&1; then
     echo "  !! $name: suite still PASSED with the guard removed -- UNVERIFIED"
     fail=1
   else
@@ -46,7 +57,7 @@ PY
   fi
 }
 
-echo "== asserting each guard can fail =="
+echo "== asserting each guard can fail (in a temp copy; repo untouched) =="
 
 run_case "flap gate" \
   'up = confirmed_up(key, bool(r["up"]), fail_counts)' \
