@@ -62,7 +62,9 @@ if ! docker run --rm -v "$DIR:/app:ro" -w /app -e NETMAP_DATA=/tmp "$IMAGE" \
   git reset --hard --quiet "$PREV"
   exit 1
 fi
-log "tests passed: $(tail -1 /tmp/netmap-deploy-tests.log)"
+# grep the SUMMARY line, not tail -1: unittest writes warnings after it, so
+# tail printed a stray ResourceWarning where the result should be.
+log "tests passed: $(grep -E "^(OK|Ran [0-9]+ test)" /tmp/netmap-deploy-tests.log | paste -sd" " || echo "see /tmp/netmap-deploy-tests.log")"
 
 # 4. Restart. `docker restart`, NOT recreate: the container may have been
 #    started with run-time flags a recreate would silently drop.

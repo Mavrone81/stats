@@ -421,6 +421,18 @@ never failed on purpose is a deploy script nobody knows the failure behaviour of
 | dirty working tree | refuses, **exit 1**, hand-edit survives untouched |
 | new commit whose tests fail | **rolls back**, exit 1, box stays on the old commit |
 
+**Is the box running what you pushed?** `/api/health` reports the deployed
+commit, unauthenticated, so you can check without SSH:
+
+```bash
+curl -s https://status.bevorasg.com/api/health
+# {"ok": true, "history_ok": true, "cycles": 1835, "version": "9df87fc3"}
+```
+
+Compare it against `git rev-parse --short=8 origin/main`. This project has had
+to answer that question the hard way more than once — a fix live in production
+while existing only on a laptop, and a deploy assumed rather than verified.
+
 Deploy history is `journalctl -u netmap-deploy`. Logs go to the journal and
 deliberately *not* to a file inside `/opt/netmap` — deploy logs living in the
 deploy target is how a working tree ends up dirty, which is how this script
