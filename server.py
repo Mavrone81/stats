@@ -117,14 +117,6 @@ BUILTIN_TARGETS = [
     {"ip": "bill.bevorasg.com", "port": 443, "label": "bill (bevora)", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Bevora", "opts": {"m": "https", "host": "bill.bevorasg.com", "path": "/", "expect": [200]}},
     {"ip": "chachisoftware.store", "port": 443, "label": "chachi website", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Chachi", "opts": {"m": "https", "host": "chachisoftware.store", "path": "/", "expect": [200]}},
     {"ip": "court.chachisoftware.store", "port": 443, "label": "chachi court", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Chachi", "opts": {"m": "https", "host": "court.chachisoftware.store", "path": "/", "expect": [200]}},
-    # Probed at /login, NOT "/". This vhost serves a STATIC brochure page from
-    # /var/www for "/" and only proxies ^/(admin|login|api|_next) to the app on
-    # :3013. Probing "/" therefore returns 200 off the filesystem and reports
-    # the site healthy while the application behind it is dead -- measured: "/"
-    # gave 200 and /login gave 502 at the same instant. A reverse proxy that
-    # can answer without the backend is the single most reliable way to build a
-    # monitoring board that lies.
-    {"ip": "crm.bevorasg.com", "port": 443, "label": "crm (bevora)", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Bevora", "opts": {"m": "https", "host": "crm.bevorasg.com", "path": "/login", "expect": [200, 302, 307]}},
     {"ip": "crm.urbanwerkzsg.com", "port": 443, "label": "crm (urbanwerkz)", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Urbanwerkz", "opts": {"m": "https", "host": "crm.urbanwerkzsg.com", "path": "/", "expect": [200, 307]}},
     {"ip": "dancestudio.chachisoftware.store", "port": 443, "label": "chachi dancestudio", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Chachi", "opts": {"m": "https", "host": "dancestudio.chachisoftware.store", "path": "/", "expect": [200]}},
     {"ip": "dine.chachisoftware.store", "port": 443, "label": "chachi dine", "seg": "edge-165", "srv": "app-165 (165.22.246.45)", "co": "Chachi", "opts": {"m": "https", "host": "dine.chachisoftware.store", "path": "/", "expect": [200]}},
@@ -194,19 +186,12 @@ BUILTIN_TARGETS = [
     # file cared enough about to lecture on in the Simple View, and then got
     # wrong by only testing the public address. Both facts are probed below.
     {"ip": "157.245.152.227", "port": 22, "label": "bevora-ops sshd (public, filtered)", "seg": "bevora-ops", "srv": "bevora-ops (157.245.152.227)", "co": "Infrastructure", "opts": {"m": "tcp"}},
-    # The VPC ingest port Bevora Ops' own agents push into -- the one port
-    # permitted across the private network. PUSH mode, not tcp: a prober
-    # outside the VPC structurally cannot see this, and probing it from outside
-    # would produce a permanently-red row that says "we cannot look" while
-    # appearing to say "it is down". Those are different facts and the board
-    # must not conflate them.
-    #
-    # This needs an agent homed on 165 (which IS in the VPC) -- see
-    # agent/push-agent.py. Until one is, this row reads STALE, which is the
-    # honest state: nobody is currently measuring the private path. Do not
-    # "fix" it by switching to tcp; fix it by homing the agent, or delete the
-    # target and say so in the README.
-    {"ip": "10.104.0.3", "port": 4100, "label": "bevora-ops ingest (VPC, needs on-VPC agent)", "seg": "bevora-ops", "srv": "bevora-ops (157.245.152.227)", "co": "Infrastructure", "opts": {"m": "push"}},
+    # The VPC ingest port Bevora Ops' agents push into -- the only port
+    # permitted across the private network. This was a `push` target while the
+    # prober ran off-VPC and structurally could not see it. netmap now runs ON
+    # bevora-ops, inside the VPC, so it is probed directly and the row means
+    # something again. (Verified from inside the container, not assumed.)
+    {"ip": "10.104.0.3", "port": 4100, "label": "bevora-ops ingest (VPC)", "seg": "bevora-ops", "srv": "bevora-ops (157.245.152.227)", "co": "Infrastructure", "opts": {"m": "tcp"}},
 ]
 
 

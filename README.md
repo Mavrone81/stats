@@ -438,6 +438,31 @@ deliberately *not* to a file inside `/opt/netmap` — deploy logs living in the
 deploy target is how a working tree ends up dirty, which is how this script
 then refuses to run.
 
+### Access: a read-only deploy key
+
+The box pulls with a **dedicated deploy key**, not a personal account and not
+an unauthenticated HTTPS clone:
+
+```bash
+ssh-keygen -t ed25519 -N "" -C "netmap-deploy@<host> (read-only)" \
+  -f /root/.ssh/netmap_deploy
+cat /root/.ssh/netmap_deploy.pub     # add at Settings -> Deploy keys
+```
+
+Two things about it are deliberate:
+
+- **Read access only.** Never tick "Allow write access". CD only ever reads,
+  and a writable key sitting on a monitoring box is a path back into the source
+  that nothing needs.
+- **`IdentitiesOnly yes`** in `/root/.ssh/config`, pinning `github.com` to that
+  key alone. Otherwise ssh offers every identity on the box and the pull may
+  quietly succeed on someone else's credential — which works right up until
+  that credential is rotated, and then fails for a reason nobody can see.
+
+A deploy key is per-repository, so it also cannot reach anything else in the
+account. That matters more than usual here: this repo is the inventory of the
+estate, and the machine holding the key is reachable from the internet.
+
 ### Installing it on the box
 
 ```bash
@@ -508,6 +533,19 @@ Recorded here because a monitoring board is also an audit:
    www.awakenfs.store` block. It is deliberately not monitored: a parking page
    answers `200` and would show green. Reachability monitoring cannot tell "our
    app" from "somebody's parking page" without a content check.
+
+1b. ~~`crm.bevorasg.com`~~ — **retired 2026-09-04.** Its backend on `:3013` had
+   been gone; only a static brochure page was answering, which is what made it
+   read green until the probe was repointed at `/login`. Removed on Samuel's
+   instruction (a replacement CRM is planned): nginx vhost, certificate and
+   `/var/www/crm.bevorasg.com` deleted, backed up first to
+   `/root/retired-crm.bevorasg.com-<timestamp>/`. Neighbouring vhosts verified
+   unaffected afterwards.
+
+   Note the DNS record still points here, so the name now falls through to
+   nginx's catch-all: `http://` returns the default 200 and `https://` fails
+   the handshake, because no certificate covers that name any more. Harmless
+   for a retired service; the replacement will need its own cert.
 
 2. ~~`track.urbanfleetsg.com` — 404~~ — **this was a monitoring defect, not an
    outage.** The app (CDMS `web-tracking`) has exactly one route,
@@ -638,7 +676,32 @@ The two are different products and both can exist:
 hostnames.** Two probers disagreeing about one host is worse than one prober.
 The 31 `edge-165` vhost rows here are exactly that duplication today.
 
-Options, for whoever owns this to decide — this repo does not pick unilaterally:
+### Decision (2026-09-04): netmap keeps its own probes
+
+Not on preference — on evidence. Bevora Ops **cannot currently be consumed**:
+`bevops-web` accepts TCP connections on `:3000` and then returns nothing. Up 20
+hours, 0 restarts, log says `✓ Ready`, CPU 0.00%, socket in `LISTEN` — and no
+bytes ever come back. Its `next-server` is bound to the container's bridge IP
+rather than `0.0.0.0`, and even probing that address directly gets a connect
+followed by silence.
+
+That is the failure this board exists to catch, sitting inside the tool that
+was supposed to be the authority: healthy by every cheap signal — container
+status, log line, listening port, successful TCP connect — and serving nothing.
+A `tcp` probe of `:3000` would report it UP. Only reading a status line finds
+it.
+
+So the duplication concern is currently theoretical: there is one working board
+and it is this one. Revisit when `bevops-web` answers again; consuming it for
+the liveness half is still the better end state, and its nginx-derived
+discovery is still better than a curated list.
+
+Not yet monitored here: `bevops-web` itself. netmap's container cannot reach
+`172.18.0.2:3000` (separate docker bridge, verified from inside the container),
+so putting it on the board means joining netmap to that stack's network — a
+change to someone else's deployment, not one to make unasked.
+
+The options remain, for when that changes:
 
 1. **Consume Bevora Ops for the liveness half.** Drop the `edge-165` vhost
    probes; read app state from its API and keep netmap to topology, segments,
