@@ -78,6 +78,18 @@ def deployed_version():
         return "unknown"
 
 
+# Snapshotted ONCE, at import, and never re-read.
+#
+# This is the whole point. Reading .git per request answers "what is checked
+# out", not "what is running" -- and the deploy checks out the new commit
+# BEFORE it restarts the container, so a request landing in that window gets
+# the new SHA from a process still running the old code. That window is short,
+# but it is exactly when someone is watching a deploy, which is the only time
+# anyone reads this field. It misled its own author within minutes of shipping:
+# a poll matched the new version, and the board it was reporting on had not
+# restarted yet.
+VERSION = deployed_version()
+
 USER = os.environ.get("NETMAP_USER")
 PASS = os.environ.get("NETMAP_PASS")
 
@@ -1230,7 +1242,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             # running, never what that code monitors.
             return self._json({"ok": True, "history_ok": HISTORY_OK,
                                "cycles": STATE.get("cycles", 0),
-                               "version": deployed_version()})
+                               "version": VERSION})
 
         g = self._gate(path)
         if g is None:

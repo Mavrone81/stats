@@ -1032,3 +1032,45 @@ class TestDeployedVersion(unittest.TestCase):
         block = src[i:i + 400]
         for leaky in ("hosts", "targets", "snapshot", "BUILTIN"):
             self.assertNotIn(leaky, block, f"/api/health exposes {leaky}")
+
+
+class TestVersionIsSnapshotted(unittest.TestCase):
+    """`/api/health` must report the RUNNING code, not the checked-out code.
+
+    The deploy does `git reset --hard` and only then restarts the container, so
+    a per-request read of .git returns the new SHA from a process still running
+    the old one. The window is seconds long and falls exactly when somebody is
+    watching a deploy -- the only time this field is ever read."""
+
+    def test_version_is_captured_at_import(self):
+        self.assertTrue(server.VERSION)
+        self.assertIsInstance(server.VERSION, str)
+
+    def test_snapshot_does_not_follow_a_later_checkout(self):
+        before = server.VERSION
+        old = server.APP_DIR
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                server.APP_DIR = d          # simulate .git changing under us
+                self.assertEqual(server.deployed_version(), "unknown",
+                                 "a live read should follow the change")
+                self.assertEqual(server.VERSION, before,
+                                 "the snapshot must NOT follow it")
+        finally:
+            server.APP_DIR = old
+
+    def test_health_serves_the_snapshot_not_a_live_read(self):
+        """Guards the wiring: reverting `VERSION` to `deployed_version()` in the
+        handler would pass every other test in this class."""
+        import inspect
+        src = inspect.getsource(server.Handler.do_GET)
+        # Match the expression itself rather than slicing N characters after a
+        # marker: the first version of this test took a 300-char window that the
+        # surrounding comments filled entirely, so it asserted against comment
+        # text and failed identically whether the code was right or sabotaged.
+        # A test that fails for the wrong reason proves nothing -- it just looks
+        # like it is working.
+        self.assertIn('"version": VERSION', src,
+                      "health must serve the import-time snapshot")
+        self.assertNotIn('"version": deployed_version()', src,
+                         "health must not re-read .git per request")
