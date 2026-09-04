@@ -978,3 +978,57 @@ class TestBrandingOnAuthPages(unittest.TestCase):
     def test_username_is_escaped_in_the_change_form(self):
         pg = server.change_page('" onload="x').decode()
         self.assertNotIn('" onload="x', pg)
+
+
+class TestDeployedVersion(unittest.TestCase):
+    """`/api/health` reports the commit being served, so "is the box running
+    what I pushed?" is answerable without SSH. This project has had to answer
+    that question the hard way more than once."""
+
+    def test_reads_a_sha_from_a_loose_ref(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, ".git", "refs", "heads"))
+            with open(os.path.join(d, ".git", "HEAD"), "w") as fh:
+                fh.write("ref: refs/heads/main\n")
+            with open(os.path.join(d, ".git", "refs", "heads", "main"), "w") as fh:
+                fh.write("abcdef1234567890abcdef1234567890abcdef12\n")
+            old = server.APP_DIR
+            try:
+                server.APP_DIR = d
+                self.assertEqual(server.deployed_version(), "abcdef12")
+            finally:
+                server.APP_DIR = old
+
+    def test_reads_a_detached_head(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, ".git"))
+            with open(os.path.join(d, ".git", "HEAD"), "w") as fh:
+                fh.write("0123456789abcdef0123456789abcdef01234567\n")
+            old = server.APP_DIR
+            try:
+                server.APP_DIR = d
+                self.assertEqual(server.deployed_version(), "01234567")
+            finally:
+                server.APP_DIR = old
+
+    def test_missing_git_returns_unknown_rather_than_raising(self):
+        """A tarball deploy has no .git. That is not a reason to fail a health
+        check -- health is about the process being alive."""
+        with tempfile.TemporaryDirectory() as d:
+            old = server.APP_DIR
+            try:
+                server.APP_DIR = d
+                self.assertEqual(server.deployed_version(), "unknown")
+            finally:
+                server.APP_DIR = old
+
+    def test_health_still_leaks_nothing_about_the_fleet(self):
+        """This endpoint is unauthenticated. Adding `version` must not have
+        turned it into an inventory disclosure."""
+        import inspect
+        src = inspect.getsource(server.Handler._api_get) + \
+              inspect.getsource(server.Handler.do_GET)
+        i = src.index('path == "/api/health"')
+        block = src[i:i + 400]
+        for leaky in ("hosts", "targets", "snapshot", "BUILTIN"):
+            self.assertNotIn(leaky, block, f"/api/health exposes {leaky}")

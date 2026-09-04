@@ -50,6 +50,34 @@ SEED_TARGETS   = os.path.join(APP_DIR, "targets.json")    # layer 2 -- deployed 
 ACKS_PATH      = os.path.join(DATA_DIR, "acks.json")
 PUSH_PATH      = os.path.join(DATA_DIR, "push.json")
 
+def deployed_version():
+    """Short commit of the checkout being served, read straight off .git.
+
+    Answers the question this project keeps having to answer the hard way:
+    is the box running what was pushed? Reads the files rather than shelling
+    out to git, because /app is mounted read-only and the runtime image has no
+    git binary. Returns "unknown" rather than raising -- a missing .git (a
+    tarball deploy, say) is not a reason to fail a health check.
+    """
+    try:
+        head = open(os.path.join(APP_DIR, ".git", "HEAD")).read().strip()
+        if head.startswith("ref: "):
+            ref = head[5:]
+            try:
+                sha = open(os.path.join(APP_DIR, ".git", ref)).read().strip()
+            except FileNotFoundError:              # packed-refs
+                sha = ""
+                for line in open(os.path.join(APP_DIR, ".git", "packed-refs")):
+                    if line.rstrip().endswith(" " + ref) or line.rstrip().endswith("\t" + ref):
+                        sha = line.split()[0]
+                        break
+        else:
+            sha = head
+        return sha[:8] or "unknown"
+    except Exception:
+        return "unknown"
+
+
 USER = os.environ.get("NETMAP_USER")
 PASS = os.environ.get("NETMAP_PASS")
 
@@ -1212,8 +1240,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == "/api/health":
             # Deliberately unauthenticated and deliberately contentless: it
             # reports that the process is alive, never what it monitors.
+            # `version` is the deployed commit. Deliberately the ONLY thing
+            # added to this unauthenticated endpoint: it says what code is
+            # running, never what that code monitors.
             return self._json({"ok": True, "history_ok": HISTORY_OK,
-                               "cycles": STATE.get("cycles", 0)})
+                               "cycles": STATE.get("cycles", 0),
+                               "version": deployed_version()})
 
         g = self._gate(path)
         if g is None:
