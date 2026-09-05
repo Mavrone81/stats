@@ -1,0 +1,25 @@
+# netmap push agent -- runs on a MONITORED host, not the dashboard host.
+#
+# It reaches OUT over https and never binds a port, so it needs no inbound
+# firewall rule. That is the entire point: the alternative was opening a
+# policy so the central prober could reach 26 loopback services, which widens
+# the blast radius of the monitoring system to tidy up a dashboard.
+[Unit]
+Description=netmap push agent
+Documentation=https://github.com/Mavrone81/stats
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/netmap-agent
+# --token-file, never --token: argv is world-readable via /proc on this host.
+ExecStart=/usr/bin/python3 /opt/netmap-agent/push-agent.py \
+    --url https://status.bevorasg.com \
+    --token-file /opt/netmap-agent/token \
+    --targets /opt/netmap-agent/targets.json \
+    --report-ip 10.104.0.4 \
+    --agent gadonghr-prod
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=180

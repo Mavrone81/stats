@@ -1,0 +1,14 @@
+[Unit]
+Description=Push netmap results every minute
+Documentation=https://github.com/Mavrone81/stats
+
+[Timer]
+OnBootSec=1min
+# Must be comfortably under the server's PUSH_TTL (300s), or rows go stale
+# between runs and a healthy agent looks like a dead one.
+OnUnitActiveSec=60s
+RandomizedDelaySec=10
+Persistent=true
+
+[Install]
+WantedBy=timers.target
