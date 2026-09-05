@@ -189,6 +189,50 @@ BUILTIN_TARGETS = [
     {"ip": "hr.bevorasg.com", "port": 443, "label": "svc-docs", "seg": "gadonghr", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "https", "host": "hr.bevorasg.com", "path": "/api/docs", "expect": [200, 401, 404]}},
     {"ip": "157.230.38.96", "port": 22, "label": "gadonghr sshd", "seg": "gadonghr", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "tcp"}},
 
+
+    # -- segment: gadonghr-internal -- PUSH, reported by an on-host agent ----
+    #
+    # 26 services bound to 127.0.0.1 on gadonghr-prod. No external prober can
+    # see them, and until now none did: the host ran 43 containers while this
+    # board watched 9 endpoints on it, which is a board that looks complete and
+    # is not. Opening a firewall so the central prober could reach them was the
+    # wrong fix -- it widens the blast radius of the monitoring system to make
+    # a dashboard tidier. agent/push-agent.py runs on the host that already has
+    # the access and pushes here instead.
+    #
+    # Identity is the HOST's VPC address (10.104.0.4), not 127.0.0.1. The agent
+    # probes loopback and reports under --report-ip, because every agent on
+    # every host would otherwise collide on the same 127.0.0.1 keys.
+    #
+    # Past the TTL these rows read STALE, never green. If the agent dies, that
+    # is what tells you -- a dead agent must not look like perfect uptime.
+    {"ip": "10.104.0.4", "port": 3100, "label": "hrms-frontend", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4011, "label": "hrms-asset", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4012, "label": "hrms-performance", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4013, "label": "hrms-training", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4014, "label": "hrms-support", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4015, "label": "hrms-esign", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4016, "label": "hrms-admin", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4017, "label": "hrms-hr-case", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4018, "label": "hrms-loans", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4019, "label": "hrms-survey", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4020, "label": "hrms-assistant", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4021, "label": "hrms-statutory-sg", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4022, "label": "hrms-benefits", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4023, "label": "hrms-statutory-my", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4100, "label": "hrms-gateway", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4101, "label": "hrms-auth", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4102, "label": "hrms-employee", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4103, "label": "hrms-payroll", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4104, "label": "hrms-leave", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4105, "label": "hrms-claims", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4106, "label": "hrms-recruitment", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4107, "label": "hrms-attendance", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4108, "label": "hrms-offboarding", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4109, "label": "hrms-notification", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 4110, "label": "hrms-reporting", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+    {"ip": "10.104.0.4", "port": 5433, "label": "hrms-postgres", "seg": "gadonghr-internal", "srv": "gadonghr-prod (157.230.38.96)", "co": "GaDong HR", "opts": {"m": "push"}},
+
     # -- segment: bevora-ops -------------------------------------------------
     # Publicly filtered on every port tried. NOT unrouted, though: all three
     # droplets share a DigitalOcean VPC (165=10.104.0.2, ops=10.104.0.3,

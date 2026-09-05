@@ -1074,3 +1074,114 @@ class TestVersionIsSnapshotted(unittest.TestCase):
                       "health must serve the import-time snapshot")
         self.assertNotIn('"version": deployed_version()', src,
                          "health must not re-read .git per request")
+
+
+def _load_agent():
+    import importlib.util
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent", "push-agent.py")
+    spec = importlib.util.spec_from_file_location("push_agent", p)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+class TestPushAgentProbe(unittest.TestCase):
+    """The agent is the ONLY thing watching 26 loopback services on gadonghr,
+    so its probe has to be as strict as the server's. An agent that reported
+    bare TCP reachability would reproduce, on the pushed half of the board,
+    exactly the weakness the central prober exists to avoid."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.agent = _load_agent()
+
+    def _serve(self, response, requests):
+        """Minimal one-shot HTTP server; records the request line it received."""
+        import socket as s, threading
+        srv = s.socket(); srv.bind(("127.0.0.1", 0)); srv.listen(1)
+        def run():
+            try:
+                c, _ = srv.accept()
+                requests.append(c.recv(512))
+                if response is not None:
+                    c.sendall(response)
+                c.close()
+            except Exception:
+                pass
+            finally:
+                srv.close()
+        threading.Thread(target=run, daemon=True).start()
+        return srv.getsockname()[1]
+
+    def test_http_mode_reads_the_status_line(self):
+        reqs = []
+        port = self._serve(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n", reqs)
+        r = self.agent.probe({"ip": "127.0.0.1", "port": port, "m": "http",
+                              "path": "/health", "expect": [200]})
+        self.assertTrue(r["up"])
+        self.assertEqual(r["code"], 200)
+
+    def test_it_requests_the_configured_path(self):
+        """These backends answer /health with 200 and / with 404 -- probing the
+        wrong path would mark every one of them down."""
+        reqs = []
+        port = self._serve(b"HTTP/1.1 200 OK\r\n\r\n", reqs)
+        self.agent.probe({"ip": "127.0.0.1", "port": port, "m": "http",
+                          "path": "/health", "expect": [200]})
+        self.assertIn(b"GET /health ", reqs[0])
+
+    def test_a_listening_socket_that_never_answers_is_DOWN(self):
+        """The bevops-web failure, exactly: accepts the connection, returns no
+        bytes. A tcp probe calls that UP."""
+        reqs = []
+        port = self._serve(None, reqs)          # accepts, sends nothing
+        r = self.agent.probe({"ip": "127.0.0.1", "port": port, "m": "http",
+                              "path": "/health", "expect": [200]}, timeout=2)
+        self.assertFalse(r["up"], "a silent socket must not be reported up")
+
+    def test_unexpected_status_is_DOWN(self):
+        reqs = []
+        port = self._serve(b"HTTP/1.1 503 Service Unavailable\r\n\r\n", reqs)
+        r = self.agent.probe({"ip": "127.0.0.1", "port": port, "m": "http",
+                              "path": "/health", "expect": [200]})
+        self.assertFalse(r["up"])
+
+    def test_refused_connection_is_DOWN(self):
+        r = self.agent.probe({"ip": "127.0.0.1", "port": 1, "m": "http"}, timeout=2)
+        self.assertFalse(r["up"])
+
+    def test_tcp_mode_still_available_for_databases(self):
+        reqs = []
+        port = self._serve(None, reqs)
+        r = self.agent.probe({"ip": "127.0.0.1", "port": port, "m": "tcp"})
+        self.assertTrue(r["up"], "postgres speaks no HTTP; tcp is correct there")
+
+    def test_targets_are_data_not_code(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = os.path.join(d, "t.json")
+            with open(f, "w") as fh:
+                json.dump([{"ip": "10.0.0.1", "port": 80, "m": "tcp"}], fh)
+            self.assertEqual(self.agent.load_targets(f)[0]["ip"], "10.0.0.1")
+
+
+class TestPushedRowsGoStale(unittest.TestCase):
+    """The whole safety property of push mode, now that 26 real services depend
+    on it: if the agent dies, its rows must go STALE, not stay green."""
+
+    def test_fresh_then_stale(self):
+        store = {"10.104.0.4:4100": {"up": True, "ms": 3, "ts": 1000}}
+        fresh = server.probe_push("10.104.0.4", 4100, {}, push_store=store, now=1100)
+        self.assertTrue(fresh["up"])
+        dead = server.probe_push("10.104.0.4", 4100, {}, push_store=store,
+                                 now=1000 + server.PUSH_TTL + 1)
+        self.assertFalse(dead["up"], "a dead agent must not look like uptime")
+        self.assertTrue(dead["stale"])
+
+    def test_every_seeded_push_target_is_in_the_internal_segment(self):
+        push = [t for t in server.BUILTIN_TARGETS
+                if (t.get("opts") or {}).get("m") == "push"]
+        self.assertTrue(push, "the push targets went missing from the seed")
+        for t in push:
+            self.assertEqual(t["seg"], "gadonghr-internal")
+            self.assertTrue(t["ip"].startswith("10.104."),
+                            "pushed rows must carry the HOST identity, not loopback")

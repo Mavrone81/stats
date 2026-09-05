@@ -1,0 +1,233 @@
+[
+  {
+    "ip": "127.0.0.1",
+    "port": 3100,
+    "m": "http",
+    "path": "/",
+    "expect": [
+      200,
+      307
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4011,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4012,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4013,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4014,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4015,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4016,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4017,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4018,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4019,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4020,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4021,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4022,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4023,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4100,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4101,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4102,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4103,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4104,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4105,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4106,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4107,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4108,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4109,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 4110,
+    "m": "http",
+    "path": "/health",
+    "expect": [
+      200
+    ]
+  },
+  {
+    "ip": "127.0.0.1",
+    "port": 5433,
+    "m": "tcp"
+  }
+]
