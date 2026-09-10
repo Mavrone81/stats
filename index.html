@@ -150,7 +150,11 @@ textarea{width:100%;min-height:340px;font:12px/1.5 ui-monospace,SFMono-Regular,M
 .dot.bad{background:var(--bad)} .dot.ack{background:var(--warnc)} .dot.unk{background:var(--mut)}
 .unver{font-size:12px;color:var(--warnc);font-weight:600}
 figure{margin:0;overflow-x:auto}
-svg{display:block;min-width:660px;max-width:100%;height:auto}
+/* SCOPED to the topology figure. This was a bare `svg{}` selector, which also
+   matched the 26px header logo and the diagram legend -- min-width:660px blew
+   the logo up to 660px square. An element selector carrying a layout
+   constraint will find every other element of that type on the page. */
+#topo svg{display:block;min-width:660px;max-width:100%;height:auto}
 .svg-l{fill:var(--fg);font:12px ui-sans-serif,system-ui,sans-serif}
 .svg-s{fill:var(--mut);font:10px ui-monospace,monospace}
 .svg-box{fill:var(--card);stroke:var(--line);stroke-width:1.5}

@@ -252,6 +252,30 @@ last submitted value.
 - **Decide where the agent permanently lives before shipping it.** An agent that
   is "proven end to end" but homeless means those rows are stale by design.
 
+### In use: 26 loopback services on gadonghr-prod
+
+That host ran **43 containers while this board watched 9 endpoints on it** — a
+board that looks complete and is not, which is the failure this project keeps
+finding elsewhere and had itself. 26 services bind `127.0.0.1` only, so no
+external prober could ever see them.
+
+Opening a firewall so the central prober could reach them was the wrong fix.
+`agent/netmap-agent.{service,timer}` runs the agent on the host that already
+has the access, every 60s — comfortably inside the 300s TTL, because a healthy
+agent must never look like a dead one just because its interval drifted past
+the staleness window.
+
+Three details that matter:
+
+- **The agent reads the status line**, not just the socket. These backends
+  answer `/health` with 200 and `/` with **404**, so the path decides whether
+  24 services read up or down. Paths were measured across all 26 before being
+  written down — 24 × `/health`, the Next.js frontend on `/`, postgres `tcp`.
+- **Rows are keyed by the host's VPC address** (`10.104.0.4`), not `127.0.0.1`.
+  The agent probes loopback and reports under `--report-ip`, because otherwise
+  every agent on every host collides on the same keys.
+- **`--token-file`, never `--token`.** argv is world-readable via `/proc`.
+
 ---
 
 ## Auth

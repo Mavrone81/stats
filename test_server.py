@@ -1185,3 +1185,35 @@ class TestPushedRowsGoStale(unittest.TestCase):
             self.assertEqual(t["seg"], "gadonghr-internal")
             self.assertTrue(t["ip"].startswith("10.104."),
                             "pushed rows must carry the HOST identity, not loopback")
+
+
+class TestNoUnscopedElementLayoutRules(unittest.TestCase):
+    """A bare `svg{min-width:660px}` — written for the topology diagram — also
+    matched the 26px header logo and blew it up to 660px square on the live
+    board. Element selectors carrying layout constraints find every other
+    element of that type on the page."""
+
+    def _css(self):
+        s = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "index.html"), encoding="utf-8").read()
+        return s[s.index("<style>"):s.index("</style>")]
+
+    def test_no_bare_media_element_selector_sets_a_size(self):
+        import re
+        css = self._css()
+        for m in re.finditer(r"(?m)^(svg|img|canvas|video|iframe|figure)\s*\{([^}]*)\}", css):
+            tag, body = m.group(1), m.group(2)
+            for prop in ("min-width", "min-height", "width:", "height:"):
+                if prop in body and "auto" not in body.split(prop)[1][:12]:
+                    self.fail(f"bare `{tag}{{}}` sets {prop} — scope it to an id/class")
+
+    def test_the_topology_rule_is_scoped(self):
+        css = self._css()
+        self.assertIn("#topo svg{", css)
+        self.assertNotIn("\nsvg{", css, "the unscoped svg rule is back")
+
+    def test_header_logo_declares_its_own_size(self):
+        s = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "index.html"), encoding="utf-8").read()
+        i = s.index('class="logo"')
+        self.assertRegex(s[i:i + 200], r'width="\d+"\s+height="\d+"')
