@@ -252,6 +252,43 @@ last submitted value.
 - **Decide where the agent permanently lives before shipping it.** An agent that
   is "proven end to end" but homeless means those rows are stale by design.
 
+### ⚠️ The first `gadonghr-internal` incidents are a test artefact (5–14 Sep 2026)
+
+`hrms-asset` (`10.104.0.4:4011`) shows as down from **2026-09-05 05:37 UTC to
+2026-09-14 14:20 UTC**. **It was never down.** Its `/health` returned 200 the
+whole time.
+
+What happened: to prove that a row goes red when the agent stops reporting it,
+the agent's target list was deliberately cut to 25 entries at 05:32 UTC on
+5 Sep. The session running that test crashed before restoring the list, and it
+stayed that way for nine days. It was restored on 14 Sep.
+
+Read the history accordingly:
+
+- **It is one event recorded as four incidents** — split at 09-09 03:46,
+  09-09 03:47 and 09-10 05:27 UTC. Each split is a netmap restart, caused by
+  the restart bug described in the next point. Do not count them as four
+  outages, and leave them out of any availability or MTTR figure.
+- **The service was unwatched, not down.** The container restarted around
+  7 Sep. Had that restart failed, nothing could have noticed.
+
+The records were left in place on purpose. Editing a monitoring history by hand
+makes it worthless as evidence; this note is the correction instead.
+
+The incident exposed two defects, both fixed in `3b8280d`:
+
+1. **Restarts faked recoveries.** The flap gate's counter lived only in memory,
+   so after a restart a confirmed-down host was reported UP for one cycle and
+   its incident was closed, then reopened. The counter is now restored from the
+   open-incident table at startup (`seed_fail_counts`).
+2. **"Agent alive, target not reported" looked like an old outage.** It is now
+   labelled `NOT REPORTED` and counted separately on the Overview
+   (`mark_drift`), so this case shows up within one TTL instead of nine days.
+
+The lesson for anyone testing on production: **put the restore in the same
+command as the change**, so the state can't outlive the session that meant to
+undo it.
+
 ### In use: 26 loopback services on gadonghr-prod
 
 That host ran **43 containers while this board watched 9 endpoints on it** — a
