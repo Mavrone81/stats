@@ -1318,3 +1318,49 @@ class TestPushDrift(unittest.TestCase):
         """WIRING: mark_drift is useless if the cycle never calls it."""
         import inspect
         self.assertIn("mark_drift(", inspect.getsource(server.run_cycle))
+
+
+class TestServersViewData(unittest.TestCase):
+    """The Servers view shows whether the MONITORING itself is healthy per
+    machine. That needs push freshness and the agent name as data; before,
+    both were only readable by parsing a detail string."""
+
+    def test_push_result_carries_age_agent_ttl(self):
+        store = {"10.104.0.4:4100": {"up": True, "ms": 3, "ts": 1000, "agent": "gadonghr-prod"}}
+        r = server.probe_push("10.104.0.4", 4100, {}, push_store=store, now=1042)
+        self.assertEqual(r["age"], 42)
+        self.assertEqual(r["agent"], "gadonghr-prod")
+        self.assertEqual(r["ttl"], server.PUSH_TTL)
+
+    def test_never_reported_has_null_age(self):
+        r = server.probe_push("10.104.0.4", 4100, {}, push_store={}, now=1000)
+        self.assertIsNone(r["age"])
+        self.assertTrue(r["stale"])
+
+    def test_snapshot_row_carries_push_age(self):
+        store = {"10.104.0.4:4100": {"up": True, "ms": 3, "ts": 1000, "agent": "a1"}}
+        snap = server.run_cycle([target(ip="10.104.0.4", port=4100, mode="push")],
+                                None, {}, now=1030, push_store=store)
+        self.assertEqual(snap[0]["push_age"], 30)
+        self.assertEqual(snap[0]["agent"], "a1")
+
+    def test_non_push_rows_have_no_push_age(self):
+        snap = server.run_cycle([target(mode="push")], None, {}, now=1000, push_store={})
+        self.assertIsNone(snap[0]["push_age"])
+
+    def test_server_notes_cover_every_seeded_server(self):
+        """A server with no notes gets no 'unmonitored' list -- which reads as
+        'everything is monitored', the exact lie this view exists to prevent."""
+        seeded = {t["srv"] for t in server.BUILTIN_TARGETS}
+        self.assertEqual(seeded, set(server.SERVER_NOTES))
+        for k, v in server.SERVER_NOTES.items():
+            self.assertIn("unmonitored", v, k)
+            self.assertIsInstance(v["unmonitored"], list, k)
+
+    def test_status_endpoint_exposes_servers_and_ttl(self):
+        import inspect
+        src = inspect.getsource(server.Handler._api_get)
+        i = src.index('path == "/api/status"')
+        block = src[i:src.index('path == "/api/overview"', i)]
+        self.assertIn('"servers": SERVER_NOTES', block)
+        self.assertIn('"push_ttl": PUSH_TTL', block)

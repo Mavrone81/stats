@@ -547,15 +547,19 @@ def probe_push(ip, port, opts, push_store=None, now=None):
     now = now if now is not None else time.time()
     store = push_store if push_store is not None else load_push()
     rec = store.get(f"{ip}:{port}")
-    if not rec:
-        return {"up": False, "ms": None, "detail": "push: never reported", "stale": True}
-    age = now - float(rec.get("ts", 0))
     ttl = int(opts.get("ttl", PUSH_TTL))
+    if not rec:
+        return {"up": False, "ms": None, "detail": "push: never reported", "stale": True,
+                "age": None, "agent": "", "ttl": ttl}
+    age = now - float(rec.get("ts", 0))
+    # age/agent/ttl ride along as DATA so the Servers view can show "agent X
+    # last reported Ns ago against a Ts TTL" without parsing the detail string.
+    extra = {"age": int(age), "agent": str(rec.get("agent", ""))[:64], "ttl": ttl}
     if age > ttl:
-        return {"up": False, "ms": rec.get("ms"), "stale": True,
-                "detail": f"push: STALE {int(age)}s > {ttl}s TTL"}
-    return {"up": bool(rec.get("up")), "ms": rec.get("ms"), "stale": False,
-            "detail": f"push: {'up' if rec.get('up') else 'down'} {int(age)}s ago"}
+        return dict(extra, up=False, ms=rec.get("ms"), stale=True,
+                    detail=f"push: STALE {int(age)}s > {ttl}s TTL")
+    return dict(extra, up=bool(rec.get("up")), ms=rec.get("ms"), stale=False,
+                detail=f"push: {'up' if rec.get('up') else 'down'} {int(age)}s ago")
 
 
 PROBES = {"tcp": probe_tcp, "http": probe_http, "https": probe_https}
@@ -789,6 +793,7 @@ def run_cycle(targets, conn, state, now=None, executor=None, push_store=None):
             "up": up, "raw_up": bool(r["up"]), "ms": r.get("ms"),
             "detail": r.get("detail", ""), "cert_days": r.get("cert_days"),
             "stale": r.get("stale", False), "drift": r.get("drift", False),
+            "push_age": r.get("age"), "agent": r.get("agent"), "ttl": r.get("ttl"),
             "ts": now,
             "pending": (not r["up"]) and up,      # failing, not yet confirmed
         })
@@ -818,6 +823,28 @@ def run_cycle(targets, conn, state, now=None, executor=None, push_store=None):
 
     return snapshot
 
+
+# Curated, DESCRIPTIVE metadata per server -- things no probe can discover:
+# the private address, what the machine is for, and above all what is NOT
+# monitored on it. That last list is the point. The most dangerous state a
+# board can be in is "looks complete and is not"; bevops-web on bevora-ops sat
+# dead for days while this board had no row for it at all. Keyed by the `srv`
+# label used on targets. Not probed, not validated: prose for humans.
+SERVER_NOTES = {
+    "app-165 (165.22.246.45)": {
+        "vpc": "10.104.0.2", "role": "shared application host -- ~20 compose stacks behind one nginx",
+        "unmonitored": ["databases and workers with no public vhost (only their public front-ends are probed)"],
+    },
+    "gadonghr-prod (157.230.38.96)": {
+        "vpc": "10.104.0.4", "role": "GaDongHR -- public side via Traefik, 26 internal services via the push agent",
+        "unmonitored": [],
+    },
+    "bevora-ops (157.245.152.227)": {
+        "vpc": "10.104.0.3", "role": "operations host -- runs this board and the Bevora Ops stack",
+        "unmonitored": ["bevops-web (:3000) -- on a separate docker bridge this container cannot reach; known dead",
+                        "bevops-db, bevops-ingest internals (only the VPC ingest port is probed)"],
+    },
+}
 
 # In-memory current state, replaced wholesale each cycle (never mutated in
 # place, so a reader always sees one consistent generation).
@@ -1397,6 +1424,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                  ack_note=(acks.get(key) or {}).get("note", "")))
             return self._json({"ts": STATE["ts"], "source": STATE["source"],
                                "history_ok": HISTORY_OK, "refresh": REFRESH,
+                               "push_ttl": PUSH_TTL, "servers": SERVER_NOTES,
                                "hosts": rows})
         if path == "/api/overview":
             win = int((q.get("window") or ["86400"])[0])

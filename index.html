@@ -273,6 +273,31 @@ textarea{width:100%;min-height:360px;font:12px/1.5 ui-monospace,SFMono-Regular,M
 .svc .act.ghost{opacity:.55} .svc:hover .act.ghost,.svc:focus-within .act.ghost{opacity:1}
 .svc.down .act.ghost,.svc.drift .act.ghost{opacity:1}
 
+/* ---- servers view: is the MONITORING of each machine healthy? ---------- */
+.srvpage{margin-bottom:22px;border:1px solid var(--line);border-radius:var(--r);background:var(--card);
+  box-shadow:var(--shadow);overflow:hidden;border-top:4px solid var(--ok)}
+.srvpage.bad{border-top-color:var(--bad)} .srvpage.warn{border-top-color:var(--warn)}
+.srvpage .hd{display:flex;align-items:flex-start;gap:14px;padding:16px 18px 12px;flex-wrap:wrap}
+.srvpage .hd .nm{font-size:17px;font-weight:680;letter-spacing:-.01em}
+.srvpage .hd .role{font-size:12.5px;color:var(--mut);margin-top:2px;max-width:60ch}
+.srvpage .hd .addr{font-size:11.5px;color:var(--mut);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:5px;display:flex;gap:14px;flex-wrap:wrap}
+.srvpage .hd .st{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start}
+.mon{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));padding:0 18px 14px}
+.mon .m{background:var(--card2);border:1px solid var(--line2);border-radius:var(--rs);padding:10px 12px;min-width:0}
+.mon .m .k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);font-weight:650}
+.mon .m .v{font-size:15px;font-weight:650;margin-top:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mon .m .v small{font-size:11.5px;font-weight:500;color:var(--mut)}
+.mon .m.bad .v{color:var(--bad-ink)} .mon .m.warn .v{color:var(--warn-ink)} .mon .m.ok .v{color:var(--ok-ink)}
+.gap{margin:0 18px 14px;padding:10px 12px;border-radius:var(--rs);background:var(--warn-bg);color:var(--warn-ink);font-size:12.5px}
+.gap b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.gap ul{margin:0;padding-left:18px} .gap li{margin:2px 0}
+.gap.none{background:var(--ok-bg);color:var(--ok-ink)}
+.srvpage .tw{border-top:1px solid var(--line2)}
+.srvpage table{min-width:720px} .srvpage th{background:var(--card2)}
+.srvpage td.meth{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--ink2);white-space:nowrap}
+.srvpage tr.down td,.srvpage tr.drift td{background:var(--bad-bg)}
+.srvpage tr.ack td{background:var(--warn-bg)}
+
 /* ---- incidents list on overview ---------------------------------------- */
 .inc{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line2)}
 .inc:last-child{border-bottom:0}
@@ -320,6 +345,8 @@ figure{margin:0;overflow-x:auto}
   .hero .chips{margin-left:0;width:100%;justify-content:flex-start}
   .kpi .n{font-size:22px}
   .cards{grid-template-columns:1fr}
+  .srvpage .hd{padding:13px 14px 10px} .mon{padding:0 14px 12px} .gap{margin:0 14px 12px}
+  .srvpage .hd .st{margin-left:0;width:100%}
   .act{min-height:44px}
   .act.ghost{min-height:40px}
 }
@@ -348,6 +375,7 @@ figure{margin:0;overflow-x:auto}
 </header>
 <nav role="tablist" aria-label="Views">
   <button role="tab" aria-selected="true"  data-t="overview">Overview</button>
+  <button role="tab" aria-selected="false" data-t="servers">Servers</button>
   <button role="tab" aria-selected="false" data-t="board">Dashboard</button>
   <button role="tab" aria-selected="false" data-t="incidents">Incidents</button>
   <button role="tab" aria-selected="false" data-t="diagram">Network diagram</button>
@@ -391,6 +419,8 @@ figure{margin:0;overflow-x:auto}
       stranded or was never opened — it is the cheapest signal that this tool
       is lying to you.</p></div>
   </section>
+
+  <section id="servers" hidden></section>
 
   <section id="board" hidden>
     <h2 class="secttl">Servers</h2>
@@ -546,6 +576,7 @@ function renderBoard(d){
     + 'that is deliberate: storage failure must never take the board down.</div>';
   renderHero(d, t, h);
   renderServerStrip(d);
+  renderServers(d);
   renderGroups(d);
   renderSimple(d);
   renderTopo(d);
@@ -598,6 +629,89 @@ function renderServerStrip(d){
         ${s.pending ? `<i class="x" style="flex:${s.pending}"></i>` : ""}
         ${bad ? `<i class="d" style="flex:${bad}"></i>` : ""}
       </div></div>`;
+  }).join("");
+}
+
+/* Servers view ------------------------------------------------------------
+   One block per machine answering two questions the dashboard cannot:
+   "what exactly is being watched here, and how?" and "is the WATCHING itself
+   working?" -- probe methods, the agent's last report against its TTL,
+   freshness of the last cycle, and (curated) what is NOT monitored. A board
+   that looks complete and is not is the worst state it can be in, so the
+   coverage gaps are printed, not implied. */
+const METH = r => {
+  const o = r.opts || {};
+  if (o.m === "push")   return "agent push";
+  if (o.m === "https")  return "https " + (o.path && o.path !== "/" ? o.path : "/");
+  if (o.m === "http")   return "http " + (o.path || "/");
+  return o.invert ? "tcp · must stay closed" : "tcp";
+};
+function renderServers(d){
+  const notes = d.servers || {};
+  const by = {};
+  d.hosts.forEach(r => { const k = r.srv || r.seg || "unassigned"; (by[k] = by[k] || []).push(r); });
+  const now = Date.now() / 1000, cycleAge = Math.max(0, Math.floor(now - d.ts));
+  $("#servers").innerHTML = Object.keys(by).sort().map(k => {
+    const rows = by[k].slice().sort((a, b) => (RANK[stateOf(a)] - RANK[stateOf(b)]) || a.label.localeCompare(b.label));
+    const m = k.match(/^(.*?)\s*\(([^)]+)\)\s*$/), name = m ? m[1] : k, ip = m ? m[2] : "";
+    const n = notes[k] || {};
+    const t = tally(rows);
+    const ext = rows.filter(r => (r.opts || {}).m !== "push"), push = rows.filter(r => (r.opts || {}).m === "push");
+    const byM = {}; ext.forEach(r => { const mm = (r.opts || {}).m || "tcp"; byM[mm] = (byM[mm] || 0) + 1; });
+    const inv = ext.filter(r => (r.opts || {}).invert).length;
+    const bad = t.down + t.drift;
+    const cls = bad ? "bad" : (t.ack || t.pending) ? "warn" : "";
+
+    /* monitoring-health tiles */
+    const tiles = [];
+    tiles.push(`<div class="m ${cycleAge > d.refresh * 3 ? "bad" : "ok"}"><div class="k">Last check</div>
+      <div class="v">${ago(d.ts)} ago <small>every ${d.refresh}s</small></div></div>`);
+    tiles.push(`<div class="m"><div class="k">External probes</div>
+      <div class="v">${ext.length} <small>${Object.entries(byM).map(([a, b]) => b + " " + a).join(" · ")}${inv ? ` · ${inv} inverted` : ""}</small></div></div>`);
+    if (push.length){
+      const ages = push.map(r => r.push_age).filter(a => a != null);
+      const newest = ages.length ? Math.min(...ages) : null, oldest = ages.length ? Math.max(...ages) : null;
+      const ttl = push[0].ttl || d.push_ttl || 300;
+      const reporting = push.filter(r => !r.stale).length;
+      const agent = (push.find(r => r.agent) || {}).agent || "agent";
+      const acls = newest == null ? "bad" : reporting < push.length ? "bad" : newest > ttl / 2 ? "warn" : "ok";
+      tiles.push(`<div class="m ${acls}"><div class="k">Agent · ${esc(agent)}</div>
+        <div class="v">${reporting} of ${push.length} reporting
+          <small>${newest == null ? "never reported" : `last ${ago(now - newest)} ago · TTL ${ttl}s`}${oldest != null && oldest !== newest ? ` · oldest ${ago(now - oldest)}` : ""}</small></div></div>`);
+      if (t.drift) tiles.push(`<div class="m bad"><div class="k">Not reported</div>
+        <div class="v">${t.drift} <small>agent alive but omits ${t.drift === 1 ? "this target" : "these targets"} — its list has drifted</small></div></div>`);
+    }
+    tiles.push(`<div class="m ${bad ? "bad" : "ok"}"><div class="k">Result</div>
+      <div class="v">${t.up} of ${rows.length} operational${bad ? ` <small>${bad} down</small>` : ""}${t.ack ? ` <small>${t.ack} known</small>` : ""}</div></div>`);
+
+    const gaps = (n.unmonitored || []);
+    const gapHtml = notes[k] ? (gaps.length
+      ? `<div class="gap"><b>Not monitored on this machine</b><ul>${gaps.map(g => `<li>${esc(g)}</li>`).join("")}</ul></div>`
+      : `<div class="gap none"><b>Coverage</b>No known gaps recorded for this machine.</div>`)
+      : `<div class="gap"><b>Coverage</b>No coverage notes recorded for this machine — treat "complete" as unverified.</div>`;
+
+    return `<div class="srvpage ${cls}">
+      <div class="hd">
+        <div><div class="nm">${esc(name)}</div>
+          ${n.role ? `<div class="role">${esc(n.role)}</div>` : ""}
+          <div class="addr">${ip ? `<span>public ${esc(ip)}</span>` : ""}${n.vpc ? `<span>vpc ${esc(n.vpc)}</span>` : ""}
+            <span>${[...new Set(rows.map(r => r.seg))].map(esc).join(" · ")}</span></div></div>
+        <div class="st">${bad ? `<span class="pill down">${bad} down</span>` : ""}${t.drift ? `<span class="pill drift">${t.drift} not reported</span>` : ""}
+          ${t.ack ? `<span class="pill ack">${t.ack} known</span>` : ""}${t.pending ? `<span class="pill pending">${t.pending} confirming</span>` : ""}
+          <span class="pill up">${t.up} operational</span></div>
+      </div>
+      <div class="mon">${tiles.join("")}</div>
+      ${gapHtml}
+      <div class="tw"><table>
+        <thead><tr><th>State</th><th>Service</th><th>How it is checked</th><th>Endpoint</th>
+          <th class="num">ms</th><th class="num">Cert</th><th>Last result</th></tr></thead>
+        <tbody>${rows.map(r => `<tr class="${stateOf(r)}">
+          <td>${statePill(r)}</td><td><strong>${esc(r.label)}</strong></td>
+          <td class="meth">${esc(METH(r))}</td><td class="seg">${esc(svcUrl(r))}</td>
+          <td class="num">${r.ms ?? "—"}</td>
+          <td class="num">${r.cert_days == null ? "—" : r.cert_days < 0 ? `<span class="pill down">expired</span>` : r.cert_days <= 21 ? `<span class="pill ack">${r.cert_days}d</span>` : r.cert_days + "d"}</td>
+          <td class="seg">${esc(r.detail)}</td></tr>`).join("")}</tbody></table></div>
+    </div>`;
   }).join("");
 }
 
