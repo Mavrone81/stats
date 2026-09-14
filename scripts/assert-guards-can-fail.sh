@@ -79,6 +79,14 @@ run_case "inverted target (port must stay closed)" \
   'invert = bool(opts.get("invert"))' \
   'invert = False'
 
+run_case "restart does not fake a recovery" \
+  '_CYCLE_STATE["fail_counts"] = seed_fail_counts(_CYCLE_STATE["open_ev"])' \
+  'pass'
+
+run_case "push drift (agent alive, target not reported)" \
+  '    mark_drift(targets, results, push_store, now)' \
+  '    pass'
+
 echo
 if [ "$fail" = 0 ]; then
   echo "All guards verified: each one, when removed, breaks the suite."

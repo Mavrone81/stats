@@ -709,6 +709,50 @@ def prune(conn, now):
 
 
 # ---------------------------------------------------------------------------
+# Push drift -- an agent that is alive but has stopped reporting a target
+# ---------------------------------------------------------------------------
+def mark_drift(targets, results, push_store, now):
+    """Relabel stale push rows whose agent is demonstrably still alive.
+
+    A stale push row can mean two completely different things, and the board
+    used to render both as the same `DOWN / STALE`:
+
+      * the agent is dead            -> every row from that host goes stale
+      * the agent is alive but its   -> THIS row is stale while its siblings
+        target list no longer          from the same host report every minute
+        includes this target
+
+    The second is a monitoring failure, not an outage, and it is the more
+    dangerous of the two because it does not look like one. hrms-asset sat in
+    exactly that state for nine days: 25 siblings fresh every 60 seconds, one
+    row stale, rendered as an ordinary old outage that nobody acted on. For all
+    nine days the service was simply unwatched -- it restarted during that time
+    and nothing could have noticed had the restart failed.
+
+    Rows stay DOWN (an unwatched service is not a healthy one). They gain
+    `drift` and a detail that names the actual problem.
+    """
+    fresh = {}
+    for key, rec in push_store.items():
+        try:
+            if now - float(rec.get("ts", 0)) <= PUSH_TTL:
+                ip = key.rsplit(":", 1)[0]
+                fresh[ip] = fresh.get(ip, 0) + 1
+        except (TypeError, ValueError):
+            continue
+    for t, r in zip(targets, results):
+        if (t.get("opts") or {}).get("m") != "push" or not r.get("stale"):
+            continue
+        n = fresh.get(t["ip"], 0)
+        if n:
+            r["drift"] = True
+            r["detail"] = (f"NOT REPORTED: the agent for {t['ip']} is alive and "
+                           f"reporting {n} other target(s) but omits this one "
+                           f"-- its target list has drifted from the board's")
+    return results
+
+
+# ---------------------------------------------------------------------------
 # The cycle
 # ---------------------------------------------------------------------------
 def run_cycle(targets, conn, state, now=None, executor=None, push_store=None):
@@ -733,6 +777,8 @@ def run_cycle(targets, conn, state, now=None, executor=None, push_store=None):
     else:
         results = [_run(t) for t in targets]
 
+    mark_drift(targets, results, push_store, now)
+
     snapshot, live_keys = [], set()
     for t, r in zip(targets, results):
         key = (t["ip"], t["port"])
@@ -742,7 +788,8 @@ def run_cycle(targets, conn, state, now=None, executor=None, push_store=None):
         row.update({
             "up": up, "raw_up": bool(r["up"]), "ms": r.get("ms"),
             "detail": r.get("detail", ""), "cert_days": r.get("cert_days"),
-            "stale": r.get("stale", False), "ts": now,
+            "stale": r.get("stale", False), "drift": r.get("drift", False),
+            "ts": now,
             "pending": (not r["up"]) and up,      # failing, not yet confirmed
         })
         snapshot.append(row)
@@ -779,10 +826,30 @@ _CYCLE_STATE = {"fail_counts": {}, "open_ev": {}, "cycles": 0}
 _DB = None
 
 
+def seed_fail_counts(open_ev):
+    """Restore the flap gate's memory from the open-incident table at startup.
+
+    THE BUG THIS FIXES: the gate's counter lives in memory, so every restart
+    forgot that a host was already confirmed down. The first post-restart
+    failure was then treated as a possible blip -- `confirmed_up` returned True
+    -- which reported the host UP for one cycle and CLOSED its incident, and the
+    next cycle reopened a fresh one. With CD restarting on every deploy, every
+    deploy faked a recovery for every broken host. Measured: one continuous
+    nine-day outage of hrms-asset was recorded as FOUR incidents, split exactly
+    at the four restarts in that window.
+
+    An open incident is precisely the persisted record of "confirmed down", so
+    those keys start at the confirmed count. A genuine recovery still clears
+    immediately, because `confirmed_up` never delays an UP.
+    """
+    return {key: DOWN_CONFIRM_CYCLES for key in open_ev}
+
+
 def prober_loop():
     global _DB
     _DB = db_open_safe()
     _CYCLE_STATE["open_ev"] = load_open_events(_DB)
+    _CYCLE_STATE["fail_counts"] = seed_fail_counts(_CYCLE_STATE["open_ev"])
     ex = concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS,
                                                thread_name_prefix="probe")
     while True:
@@ -838,6 +905,10 @@ def overview(snapshot, conn, acks, window=86400, now=None, buckets=48):
         "ts": now, "history_ok": HISTORY_OK, "window": window,
         "total": len(snapshot), "up": up, "down": len(down_rows),
         "down_unacked": len(unacked_down),
+        # Rows whose agent is alive but no longer reports them. Surfaced as its
+        # own number because the failure it counts is INVISIBLE otherwise: it
+        # renders like an old outage and sat unnoticed for nine days.
+        "drift": sum(1 for r in snapshot if r.get("drift")),
         "segments": sorted(segs.values(), key=lambda s: s["seg"]),
         "cert_warn": sorted(
             [{"label": r["label"], "host": (r.get("opts") or {}).get("host", r["ip"]),

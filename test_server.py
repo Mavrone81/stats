@@ -1217,3 +1217,104 @@ class TestNoUnscopedElementLayoutRules(unittest.TestCase):
                               "index.html"), encoding="utf-8").read()
         i = s.index('class="logo"')
         self.assertRegex(s[i:i + 200], r'width="\d+"\s+height="\d+"')
+
+
+class TestRestartDoesNotFakeARecovery(unittest.TestCase):
+    """One continuous nine-day outage of hrms-asset was recorded as FOUR
+    incidents, split exactly at the four netmap restarts in that window. The
+    flap gate's counter lived only in memory, so each restart forgot the host
+    was already confirmed down, absorbed its next failure as a 'blip', reported
+    it UP, and closed the incident. CD restarts on every deploy, so every deploy
+    faked a recovery for every broken host."""
+
+    def _outage_across_a_restart(self, seed):
+        conn = mkdb()
+        t = target(mode="push")
+        state = {}
+        for i in range(2):                      # confirm it down
+            server.run_cycle([t], conn, state, now=1000 + i * 30, push_store={})
+        self.assertEqual(len(server.load_open_events(conn)), 1)
+        # --- netmap restarts: all in-memory state is gone ---
+        open_ev = server.load_open_events(conn)
+        state = {"open_ev": open_ev,
+                 "fail_counts": server.seed_fail_counts(open_ev) if seed else {}}
+        snap = server.run_cycle([t], conn, state, now=2000, push_store={})
+        return conn, snap
+
+    def test_a_down_host_stays_down_across_a_restart(self):
+        conn, snap = self._outage_across_a_restart(seed=True)
+        self.assertFalse(snap[0]["up"], "a restart reported a still-down host UP")
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM event").fetchone()[0], 1,
+                         "one outage must stay ONE incident across a restart")
+
+    def test_the_bug_reproduces_without_seeding(self):
+        """Pins what the fix is for: without it, the restart splits the incident."""
+        conn, snap = self._outage_across_a_restart(seed=False)
+        self.assertTrue(snap[0]["up"], "precondition: unseeded gate absorbs the failure")
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM event WHERE up_ts IS NOT NULL").fetchone()[0], 1,
+                         "precondition: the unseeded gate closes the incident")
+
+    def test_a_real_recovery_still_clears_immediately(self):
+        counts = server.seed_fail_counts({("10.0.0.1", 80): 7})
+        self.assertTrue(server.confirmed_up(("10.0.0.1", 80), True, counts))
+
+    def test_prober_loop_actually_seeds(self):
+        """WIRING: seed_fail_counts is useless if startup never calls it."""
+        import inspect
+        src = inspect.getsource(server.prober_loop)
+        self.assertIn("seed_fail_counts(", src,
+                      "prober_loop must seed the gate from open incidents")
+
+
+class TestPushDrift(unittest.TestCase):
+    """A stale push row whose agent is still reporting its siblings is a
+    MONITORING failure, not an outage. hrms-asset sat in that state for nine
+    days, rendered as an ordinary old outage, with 25 siblings fresh every
+    minute -- and was unwatched the whole time."""
+
+    NOW = 10_000
+
+    def _targets(self):
+        return [target(ip="10.104.0.4", port=p, mode="push") for p in (4011, 4100, 4101)]
+
+    def test_agent_alive_but_omitting_a_target_is_drift(self):
+        store = {"10.104.0.4:4100": {"up": True, "ts": self.NOW - 10},
+                 "10.104.0.4:4101": {"up": True, "ts": self.NOW - 10}}
+        snap = server.run_cycle(self._targets(), None, {}, now=self.NOW, push_store=store)
+        row = [r for r in snap if r["port"] == 4011][0]
+        self.assertTrue(row["drift"])
+        self.assertIn("NOT REPORTED", row["detail"])
+        self.assertFalse(row["raw_up"], "an unwatched service must not read healthy")
+
+    def test_a_dead_agent_is_not_drift(self):
+        """Every row stale = the agent itself is gone, a different fault."""
+        old = self.NOW - server.PUSH_TTL - 50
+        store = {f"10.104.0.4:{p}": {"up": True, "ts": old} for p in (4011, 4100, 4101)}
+        snap = server.run_cycle(self._targets(), None, {}, now=self.NOW, push_store=store)
+        self.assertFalse(any(r["drift"] for r in snap))
+
+    def test_a_reported_outage_is_not_drift(self):
+        """The agent SAYS it is down -> that is a real outage, never relabelled."""
+        store = {"10.104.0.4:4011": {"up": False, "ts": self.NOW - 10},
+                 "10.104.0.4:4100": {"up": True, "ts": self.NOW - 10}}
+        snap = server.run_cycle(self._targets()[:2], None, {}, now=self.NOW, push_store=store)
+        row = [r for r in snap if r["port"] == 4011][0]
+        self.assertFalse(row["drift"])
+        self.assertFalse(row["raw_up"])
+
+    def test_drift_is_scoped_per_host(self):
+        """A fresh agent on ANOTHER host must not make this one look alive."""
+        store = {"10.104.0.9:4100": {"up": True, "ts": self.NOW - 10}}
+        snap = server.run_cycle(self._targets()[:1], None, {}, now=self.NOW, push_store=store)
+        self.assertFalse(snap[0]["drift"])
+
+    def test_overview_counts_drift_separately(self):
+        store = {"10.104.0.4:4100": {"up": True, "ts": self.NOW - 10}}
+        snap = server.run_cycle(self._targets()[:2], None, {}, now=self.NOW, push_store=store)
+        o = server.overview(snap, None, {}, now=self.NOW)
+        self.assertEqual(o["drift"], 1)
+
+    def test_run_cycle_actually_marks_drift(self):
+        """WIRING: mark_drift is useless if the cycle never calls it."""
+        import inspect
+        self.assertIn("mark_drift(", inspect.getsource(server.run_cycle))

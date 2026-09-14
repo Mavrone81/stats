@@ -77,6 +77,10 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
    most red rows are states we chose on purpose. */
 .pill.ack{background:var(--warnbg);color:var(--warnc)}
 .pill.pending{background:var(--chip);color:var(--mut)}
+/* Striped, not solid: a drift row is "we are not looking", which is a
+   different fact from "it is down" and must not be mistaken for one. */
+.pill.drift{color:var(--bad);border:1px dashed var(--bad);
+  background:repeating-linear-gradient(135deg,var(--badbg) 0 5px,transparent 5px 10px)}
 .seg{font-size:11px;color:var(--mut);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .bar{display:flex;gap:1px;height:34px;align-items:flex-end}
 .bar div{flex:1;min-width:2px;border-radius:1px 1px 0 0;background:var(--up)}
@@ -299,6 +303,9 @@ const ep = r => (r.opts && r.opts.host)
   : esc(r.ip) + ":" + r.port;
 
 function statePill(r){
+  // Before ack/down: an agent that stopped reporting a row is a MONITORING
+  // failure, and must never read as an ordinary (old) outage.
+  if (r.drift)       return '<span class="pill drift">NOT REPORTED</span>';
   if (r.up && r.ack) return '<span class="pill ack">up · acked</span>';
   if (r.up)          return '<span class="pill up">up</span>';
   if (r.ack === "perm")   return '<span class="pill ack">down by design</span>';
@@ -432,7 +439,9 @@ function renderOverview(o){
     <div class="kpi ${o.open_incidents ? "bad" : ""}"><div class="n">${o.open_incidents}</div>
       <div class="l">open incidents</div></div>
     <div class="kpi ${o.cert_warn.length ? "warn" : ""}"><div class="n">${o.cert_warn.length}</div>
-      <div class="l">certs &lt; 21d</div></div>`;
+      <div class="l">certs &lt; 21d</div></div>
+    <div class="kpi ${o.drift ? "bad" : ""}"><div class="n">${o.drift || 0}</div>
+      <div class="l">not reported by agent</div></div>`;
   const tl = o.timeline || [];
   $("#timeline").innerHTML = tl.length ? tl.map(b => b.pct == null
     ? '<div class="n" style="height:6px"></div>'
