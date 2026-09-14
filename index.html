@@ -6,194 +6,347 @@
 <title>bevoraSG network map</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230d1117'/%3E%3Cpath d='M9 22 L16 10 L23 19' fill='none' stroke='%235b90ff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='10' r='3.6' fill='%233fb950'/%3E%3Ccircle cx='9' cy='22' r='3.1' fill='%235b90ff'/%3E%3Ccircle cx='23' cy='19' r='3.1' fill='%235b90ff'/%3E%3C/svg%3E">
 <style>
-/* Light is the base palette. Dark redefines ONLY the tokens, twice: once for
-   the system preference and once for an explicit toggle, so neither can strand
-   the other. No colour is ever defined only inside a media query. */
+/* =====================================================================
+   DESIGN NOTES — read before restyling
+
+   This is a STATUS board. It has one job on first glance: answer "is
+   anything wrong right now?" — and only then "what, where, and since when".
+   Every layout decision below serves that order:
+
+   1. A status band sits under the tabs on EVERY view. Calm when healthy,
+      loud when not. Green is quiet by design; red is the only thing on the
+      page allowed to shout.
+   2. Colour never carries state alone. Each state has a glyph + a word
+      (● Operational, ✕ Not answering, ◐ Known, ◌ Not reported, ◔ Confirming).
+      The validator confirmed green/red separate under every CVD simulation,
+      but the label is what makes it certain.
+   3. Healthy cards are compact; unhealthy cards expand and sort first. The
+      reader should never scan 60 green cards to find the red one.
+   4. No web fonts, no external assets. The page's own CSP blocks them, and a
+      board that depends on Google being up is a board that lies during the
+      outage it exists to show. System stack, chosen carefully.
+   5. Light is the base palette. Dark redefines ONLY tokens, twice (system
+      preference + explicit toggle) so neither can strand the other. Text
+      uses *-ink tokens (contrast-safe), marks use the raw status hue.
+   ===================================================================== */
 :root{
-  --bg:#f5f6f8; --card:#ffffff; --fg:#11161d; --mut:#5b6775; --line:#e0e4e9;
-  --acc:#2563eb; --up:#0e7c4a; --upbg:#e7f6ee; --bad:#b42318; --badbg:#fdeceb;
-  --warnc:#8a5a00; --warnbg:#fdf3e0; --chip:#eef1f5; --shadow:0 1px 2px rgba(16,24,40,.06);
+  --bg:#f4f6f8; --card:#ffffff; --card2:#f8fafb; --fg:#0f1419; --ink2:#3f4a57;
+  --mut:#6b7684; --line:#e3e7ec; --line2:#eef1f4; --chip:#eef1f5;
+  --acc:#2563eb; --acc-bg:#e8efff;
+  --ok:#0ca30c;   --ok-ink:#0a7a0a;   --ok-bg:#e7f6e7;
+  --warn:#fab219; --warn-ink:#8a5a00; --warn-bg:#fff4d6;
+  --bad:#d03b3b;  --bad-ink:#b42318;  --bad-bg:#fdecec;
+  --unk:#9aa3af;  --unk-bg:#eef0f3;
+  --shadow:0 1px 2px rgba(16,24,40,.05), 0 1px 1px rgba(16,24,40,.03);
+  --r:12px; --rs:8px;
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme=light]){
-    --bg:#0d1117; --card:#161b22; --fg:#e6edf3; --mut:#8b949e; --line:#2c333c;
-    --acc:#5b90ff; --up:#3fb950; --upbg:#10261a; --bad:#f85149; --badbg:#2b1213;
-    --warnc:#e3b341; --warnbg:#2a2113; --chip:#21262d; --shadow:none;
+    --bg:#0b0f14; --card:#121820; --card2:#0f141b; --fg:#e8edf3; --ink2:#b7c0cb;
+    --mut:#8792a0; --line:#1f2833; --line2:#182029; --chip:#1a222c;
+    --acc:#4f8cff; --acc-bg:#132038;
+    --ok:#0ca30c;   --ok-ink:#48c65f;   --ok-bg:#0f2a17;
+    --warn:#fab219; --warn-ink:#f5c55a; --warn-bg:#2a2210;
+    --bad:#d03b3b;  --bad-ink:#f47272;  --bad-bg:#2c1416;
+    --unk:#7d8794;  --unk-bg:#1a2029;
+    --shadow:none;
   }
 }
 :root[data-theme=dark]{
-  --bg:#0d1117; --card:#161b22; --fg:#e6edf3; --mut:#8b949e; --line:#2c333c;
-  --acc:#5b90ff; --up:#3fb950; --upbg:#10261a; --bad:#f85149; --badbg:#2b1213;
-  --warnc:#e3b341; --warnbg:#2a2113; --chip:#21262d; --shadow:none;
+  --bg:#0b0f14; --card:#121820; --card2:#0f141b; --fg:#e8edf3; --ink2:#b7c0cb;
+  --mut:#8792a0; --line:#1f2833; --line2:#182029; --chip:#1a222c;
+  --acc:#4f8cff; --acc-bg:#132038;
+  --ok:#0ca30c;   --ok-ink:#48c65f;   --ok-bg:#0f2a17;
+  --warn:#fab219; --warn-ink:#f5c55a; --warn-bg:#2a2210;
+  --bad:#d03b3b;  --bad-ink:#f47272;  --bad-bg:#2c1416;
+  --unk:#7d8794;  --unk-bg:#1a2029;
+  --shadow:none;
 }
 *{box-sizing:border-box}
+html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--fg);
-  font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  -webkit-text-size-adjust:100%}
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable","Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased}
 a{color:var(--acc)}
+code,.mono{font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+button{font:inherit}
+
+/* ---- header ---------------------------------------------------------- */
+header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;
+  padding:10px 20px;background:var(--card);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
 .logo{display:inline-flex;line-height:0;flex:none}
 .logo svg{display:block}
-.lg-bg{fill:#0d1117}
-.lg-ln{stroke:var(--acc)}
-.lg-a{fill:var(--up)}
-.lg-b{fill:var(--acc)}
-:root[data-theme=dark] .lg-bg{fill:#000}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .lg-bg{fill:#000}}
-header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-  padding:14px 20px;background:var(--card);border-bottom:1px solid var(--line)}
-h1{font-size:16px;margin:0;font-weight:650;letter-spacing:-.01em}
+.lg-bg{fill:#0d1117} .lg-ln{stroke:#4f8cff} .lg-a{fill:#3fb950} .lg-b{fill:#4f8cff}
+.brand h1{font-size:15px;margin:0;font-weight:650;letter-spacing:-.01em;line-height:1.15}
+.brand .sub{font-size:11px;color:var(--mut);letter-spacing:.02em}
 .grow{flex:1}
-.meta{font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums}
-nav{display:flex;gap:4px;padding:0 12px;background:var(--card);
-  border-bottom:1px solid var(--line);overflow-x:auto}
+.live{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--mut);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.pulse{width:7px;height:7px;border-radius:99px;background:var(--ok);flex:none;
+  box-shadow:0 0 0 0 rgba(12,163,12,.45);animation:pulse 2.4s ease-out infinite}
+.live.stale .pulse{background:var(--unk);animation:none;box-shadow:none}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(12,163,12,.45)}70%{box-shadow:0 0 0 7px rgba(12,163,12,0)}100%{box-shadow:0 0 0 0 rgba(12,163,12,0)}}
+@media (prefers-reduced-motion:reduce){.pulse{animation:none}}
+.hbtns{display:flex;gap:6px;align-items:center}
+
+/* buttons */
+.act{background:var(--card);border:1px solid var(--line);color:var(--ink2);
+  border-radius:var(--rs);padding:6px 11px;font-size:12.5px;font-weight:550;cursor:pointer;
+  min-height:34px;display:inline-flex;align-items:center;gap:6px;transition:border-color .12s,background .12s}
+.act:hover{border-color:var(--acc);color:var(--fg)}
+.act.ghost{background:transparent;border-color:transparent;color:var(--mut);padding:4px 8px;min-height:28px}
+.act.ghost:hover{background:var(--chip);color:var(--fg);border-color:transparent}
+.act.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+.act.primary:hover{filter:brightness(1.07)}
+.act.icon{padding:6px 9px}
+
+/* ---- tabs ------------------------------------------------------------ */
+nav{display:flex;gap:2px;padding:0 12px;background:var(--card);
+  border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
 nav button{background:none;border:0;border-bottom:2px solid transparent;color:var(--mut);
-  padding:11px 14px;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap;min-height:44px}
+  padding:11px 13px;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap;min-height:44px;
+  margin-bottom:-1px;transition:color .12s}
+nav button:hover{color:var(--fg)}
 nav button[aria-selected=true]{color:var(--fg);border-bottom-color:var(--acc)}
-main{padding:20px;max-width:1400px;margin:0 auto}
+
+/* ---- status band (every view) ---------------------------------------- */
+.band{display:flex;align-items:center;gap:12px;padding:12px 20px;
+  border-bottom:1px solid var(--line);background:var(--card2);font-size:14px}
+.band .glyph{width:30px;height:30px;border-radius:99px;display:grid;place-items:center;
+  font-size:14px;font-weight:700;flex:none;color:#fff}
+.band .msg{font-weight:600;min-width:0}
+.band .msg small{display:block;font-weight:450;color:var(--mut);font-size:12px;margin-top:1px}
+.band.ok   {background:var(--ok-bg)}   .band.ok .glyph{background:var(--ok)}
+.band.bad  {background:var(--bad-bg)}  .band.bad .glyph{background:var(--bad)}
+.band.warn {background:var(--warn-bg)} .band.warn .glyph{background:var(--warn);color:#1a1200}
+.band.drift{background:var(--bad-bg)}  .band.drift .glyph{background:transparent;color:var(--bad-ink);border:2px dashed var(--bad)}
+.band.unk  {background:var(--unk-bg)}  .band.unk .glyph{background:var(--unk)}
+
+/* ---- layout ---------------------------------------------------------- */
+main{padding:20px;max-width:1440px;margin:0 auto;transition:opacity .2s}
+main.busy{opacity:.6}
 section[hidden]{display:none}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;
-  padding:16px;margin-bottom:16px;box-shadow:var(--shadow)}
-.card h2{font-size:13px;margin:0 0 12px;text-transform:uppercase;
-  letter-spacing:.05em;color:var(--mut)}
-.kpis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
-.kpi .n{font-size:27px;font-weight:680;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
-.kpi .l{font-size:12px;color:var(--mut);margin-top:2px}
-.kpi.bad .n{color:var(--bad)} .kpi.good .n{color:var(--up)} .kpi.warn .n{color:var(--warnc)}
-/* Every table scrolls inside its own box. The page body must never scroll
-   sideways -- a horizontally-shifted board is unreadable on a phone. */
-.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
-table{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
-th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);
-  font-weight:600;position:sticky;top:0;background:var(--card)}
-tbody tr:hover{background:var(--chip)}
-td.num{text-align:right;font-variant-numeric:tabular-nums}
-.pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;
-  font-weight:650;white-space:nowrap}
-.pill.up{background:var(--upbg);color:var(--up)}
-.pill.down{background:var(--badbg);color:var(--bad)}
-/* Acked states are amber, never red. Red stops carrying information the moment
-   most red rows are states we chose on purpose. */
-.pill.ack{background:var(--warnbg);color:var(--warnc)}
-.pill.pending{background:var(--chip);color:var(--mut)}
-/* Striped, not solid: a drift row is "we are not looking", which is a
-   different fact from "it is down" and must not be mistaken for one. */
-.pill.drift{color:var(--bad);border:1px dashed var(--bad);
-  background:repeating-linear-gradient(135deg,var(--badbg) 0 5px,transparent 5px 10px)}
-.seg{font-size:11px;color:var(--mut);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-.bar{display:flex;gap:1px;height:34px;align-items:flex-end}
-.bar div{flex:1;min-width:2px;border-radius:1px 1px 0 0;background:var(--up)}
-.bar div.p{background:var(--bad)}
-.bar div.n{background:var(--line)}
-.inv{padding:10px 12px;border-radius:8px;font-size:13px;font-weight:600}
-.inv.ok{background:var(--upbg);color:var(--up)}
-.inv.no{background:var(--badbg);color:var(--bad)}
-.banner{padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:14px;
-  background:var(--warnbg);color:var(--warnc);border:1px solid var(--line)}
-button.act{background:var(--chip);border:1px solid var(--line);color:var(--fg);
-  border-radius:7px;padding:5px 10px;font:inherit;font-size:12px;cursor:pointer;min-height:32px}
-button.act:hover{border-color:var(--acc)}
-textarea{width:100%;min-height:340px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
-  background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:11px}
-.msg{margin-top:10px;font-size:13px}
-.msg.ok{color:var(--up)} .msg.err{color:var(--bad)}
-/* Card board -------------------------------------------------------------
-   A 45-row table forces you to read every line to find the one that matters.
-   Cards group by server, then by company, so an outage is located before it
-   is read: which machine, whose product, which URL. */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow)}
+.card > h2{font-size:12px;margin:0 0 12px;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--mut);font-weight:650;display:flex;align-items:baseline;gap:8px}
+.card > h2 .n{font-weight:500;text-transform:none;letter-spacing:0;color:var(--mut)}
+.grid2{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.meta{font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums}
+.empty{color:var(--mut);font-size:13px;padding:6px 0}
 .secttl{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);
   font-weight:650;margin:0 0 10px}
-.srvstrip{display:grid;gap:12px;margin-bottom:24px;
-  grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
-.srvcard{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--up);
-  border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
-.srvcard.bad{border-left-color:var(--bad)}
-.srvcard.warn{border-left-color:var(--warnc)}
+
+/* ---- hero (Overview only) -------------------------------------------- */
+.hero{display:flex;align-items:center;gap:22px;padding:22px 24px;margin-bottom:14px;
+  border-radius:var(--r);border:1px solid var(--line);background:var(--card);box-shadow:var(--shadow);
+  border-left-width:5px}
+.hero.ok{border-left-color:var(--ok)} .hero.bad{border-left-color:var(--bad)}
+.hero.warn{border-left-color:var(--warn)} .hero.drift{border-left-color:var(--bad)}
+.hero .big{font-size:52px;font-weight:700;line-height:1;letter-spacing:-.03em;min-width:0}
+.hero.ok .big{color:var(--ok-ink)} .hero.bad .big,.hero.drift .big{color:var(--bad-ink)} .hero.warn .big{color:var(--warn-ink)}
+.hero .txt{min-width:0}
+.hero .txt .h{font-size:17px;font-weight:650;letter-spacing:-.01em}
+.hero .txt .s{font-size:13px;color:var(--mut);margin-top:3px}
+.hero .chips{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+
+/* stat tiles */
+.kpis{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 15px;
+  box-shadow:var(--shadow);min-width:0}
+.kpi .n{font-size:26px;font-weight:680;letter-spacing:-.02em;line-height:1.1}
+.kpi .l{font-size:12px;color:var(--mut);margin-top:3px}
+.kpi.good .n{color:var(--ok-ink)} .kpi.bad .n{color:var(--bad-ink)} .kpi.warn .n{color:var(--warn-ink)}
+
+/* ---- status pills & glyphs -------------------------------------------- */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px 2px 7px;border-radius:99px;
+  font-size:11px;font-weight:650;white-space:nowrap;line-height:1.6;letter-spacing:.01em}
+.pill::before{content:"";width:7px;height:7px;border-radius:99px;background:currentColor;flex:none}
+.pill.up{background:var(--ok-bg);color:var(--ok-ink)}
+.pill.down{background:var(--bad-bg);color:var(--bad-ink)}
+.pill.ack{background:var(--warn-bg);color:var(--warn-ink)}
+.pill.ack::before{background:linear-gradient(90deg,currentColor 50%,transparent 50%);border:1.5px solid currentColor;width:6px;height:6px}
+.pill.pending{background:var(--unk-bg);color:var(--mut)}
+.pill.pending::before{border:1.5px solid currentColor;background:transparent;width:6px;height:6px}
+/* drift = "we are not looking", a different fact from "it is down": dashed
+   ring and a striped fill so it can never be mistaken for an old outage. */
+.pill.drift{color:var(--bad-ink);border:1px dashed var(--bad);
+  background:repeating-linear-gradient(135deg,var(--bad-bg) 0 5px,transparent 5px 10px)}
+.pill.drift::before{border:1.5px dashed currentColor;background:transparent;width:6px;height:6px}
+.pill.neutral{background:var(--chip);color:var(--ink2)}
+.pill.neutral::before{display:none}
+
+/* ---- timeline (status-page bar) ---------------------------------------
+   Fixed-height marks: colour carries state, not height. Variable height
+   would read as a magnitude chart, which this is not. 2px gaps between
+   marks, rounded 2px tops. One series, so no legend — the caption names it.*/
+.tl{display:flex;gap:2px;height:38px;align-items:stretch;padding:2px 0}
+.tl button{flex:1;min-width:3px;border:0;padding:0;border-radius:2px 2px 1px 1px;cursor:default;
+  background:var(--ok);transition:transform .08s}
+.tl button.p{background:var(--warn)} .tl button.d{background:var(--bad)} .tl button.n{background:var(--line)}
+.tl button:hover,.tl button:focus-visible{transform:scaleY(1.08);filter:brightness(1.12);outline:none;box-shadow:0 0 0 2px var(--card),0 0 0 3px var(--acc)}
+.tlaxis{display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-top:6px;font-variant-numeric:tabular-nums}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--mut);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:5px}
+
+/* shared tooltip */
+#tip{position:fixed;z-index:50;pointer-events:none;background:var(--fg);color:var(--bg);
+  padding:7px 10px;border-radius:8px;font-size:12px;line-height:1.4;box-shadow:0 6px 24px rgba(0,0,0,.25);
+  max-width:260px;opacity:0;transition:opacity .1s}
+#tip.on{opacity:1}
+#tip b{font-size:13px}
+
+/* ---- tables ---------------------------------------------------------- */
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:560px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line2);vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;
+  position:sticky;top:0;background:var(--card)}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:var(--card2)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.ongoing td{background:var(--bad-bg)}
+.seg{font-size:11.5px;color:var(--mut);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+/* ---- integrity & banners --------------------------------------------- */
+.inv{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--rs);font-size:13px;font-weight:600}
+.inv.ok{background:var(--ok-bg);color:var(--ok-ink)} .inv.no{background:var(--bad-bg);color:var(--bad-ink)}
+.banner{padding:10px 12px;border-radius:var(--rs);font-size:13px;margin-bottom:14px;
+  background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--line)}
+.msg{margin-top:10px;font-size:13px} .msg.ok{color:var(--ok-ink)} .msg.err{color:var(--bad-ink)}
+textarea{width:100%;min-height:360px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+  background:var(--card2);color:var(--fg);border:1px solid var(--line);border-radius:var(--rs);padding:12px}
+
+/* ---- server strip ---------------------------------------------------- */
+.srvstrip{display:grid;gap:12px;margin-bottom:22px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.srvcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;
+  box-shadow:var(--shadow);border-top:3px solid var(--ok)}
+.srvcard.bad{border-top-color:var(--bad)} .srvcard.warn{border-top-color:var(--warn)}
+.srvcard .top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
 .srvcard .nm{font-weight:650;font-size:14px}
-.srvcard .ip{font-size:11px;color:var(--mut);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-  margin-top:1px}
-.srvcard .row{display:flex;align-items:baseline;gap:14px;margin-top:10px}
-.srvcard .big{font-size:24px;font-weight:680;font-variant-numeric:tabular-nums;line-height:1}
-.srvcard .big.ok{color:var(--up)} .srvcard .big.no{color:var(--bad)}
-.srvcard .cap{font-size:11px;color:var(--mut)}
-.srvbar{display:flex;height:5px;border-radius:3px;overflow:hidden;margin-top:11px;background:var(--line)}
-.srvbar i{display:block;height:100%}
-.srvbar i.u{background:var(--up)} .srvbar i.a{background:var(--warnc)} .srvbar i.d{background:var(--bad)}
+.srvcard .ip{font-size:11px;color:var(--mut);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:1px}
+.srvcard .row{display:flex;align-items:baseline;gap:10px;margin-top:12px}
+.srvcard .big{font-size:26px;font-weight:700;line-height:1;letter-spacing:-.02em}
+.srvcard .big.ok{color:var(--ok-ink)} .srvcard .big.no{color:var(--bad-ink)}
+.srvcard .cap{font-size:12px;color:var(--mut)}
+/* meter: 2px surface gaps between segments (never borders) */
+.srvbar{display:flex;gap:2px;height:6px;margin-top:12px}
+.srvbar i{display:block;height:100%;border-radius:2px;min-width:0}
+.srvbar i.u{background:var(--ok)} .srvbar i.a{background:var(--warn)} .srvbar i.d{background:var(--bad)} .srvbar i.x{background:var(--line)}
+
+/* ---- groups & service cards ------------------------------------------- */
 .srvblock{margin-bottom:26px}
-.srvblock > h3{font-size:15px;font-weight:650;margin:0 0 2px;
-  display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-.srvblock > .sub{font-size:11px;color:var(--mut);margin:0 0 14px;
-  font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.srvblock > h3{font-size:15px;font-weight:650;margin:0 0 2px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.srvblock > .sub{font-size:11.5px;color:var(--mut);margin:0 0 14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .grp{margin:0 0 16px}
-.grp h4{font-size:12px;font-weight:650;color:var(--mut);margin:0 0 8px;
-  text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:8px}
-.grp h4 .n{font-weight:500;text-transform:none;letter-spacing:0;font-size:11px}
-.cards{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(268px,1fr))}
-.svc{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--up);
-  border-radius:10px;padding:11px 13px;box-shadow:var(--shadow);min-width:0}
-.svc.down{border-left-color:var(--bad)}
-.svc.ack{border-left-color:var(--warnc)}
+.grp h4{font-size:11.5px;font-weight:650;color:var(--mut);margin:0 0 8px;text-transform:uppercase;
+  letter-spacing:.06em;display:flex;align-items:center;gap:8px}
+.grp h4 .n{font-weight:500;text-transform:none;letter-spacing:0}
+.grp h4 .pill{margin-left:2px;text-transform:none;letter-spacing:.01em}
+.cards{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(272px,1fr))}
+.svc{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:11px 13px 10px;
+  box-shadow:var(--shadow);min-width:0;display:flex;flex-direction:column;gap:6px;
+  transition:border-color .12s,box-shadow .12s}
+.svc:hover{border-color:var(--mut)}
 .svc .top{display:flex;align-items:flex-start;gap:8px;justify-content:space-between}
 .svc .nm{font-weight:600;font-size:13.5px;line-height:1.3;min-width:0;overflow-wrap:anywhere}
 .svc .url{font-size:11px;color:var(--mut);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-  margin-top:3px;overflow-wrap:anywhere}
-.svc .meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:11px;color:var(--mut);
-  font-variant-numeric:tabular-nums;align-items:center}
-.svc .det{font-size:11px;color:var(--mut);margin-top:6px;overflow-wrap:anywhere}
-.svc .det.bad{color:var(--bad);font-weight:600}
-.svc button.act{margin-top:9px;font-size:11px;min-height:28px;padding:3px 9px}
-/* Simple view */
+  margin-top:2px;overflow-wrap:anywhere}
+.svc .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:11.5px;color:var(--mut);
+  font-variant-numeric:tabular-nums;align-items:center;min-height:18px}
+.svc .meta .warn{color:var(--warn-ink);font-weight:600}
+.svc .meta .bad{color:var(--bad-ink);font-weight:600}
+.svc .det{font-size:12px;color:var(--ink2);overflow-wrap:anywhere;display:none}
+.svc .foot{display:flex;justify-content:flex-end;margin-top:2px}
+/* unhealthy cards expand: detail visible, coloured edge, stronger surface */
+.svc.down,.svc.drift,.svc.ack,.svc.pending{border-left-width:4px}
+.svc.down{border-left-color:var(--bad);background:linear-gradient(90deg,var(--bad-bg) 0,var(--card) 30%)}
+.svc.drift{border-left-color:var(--bad);border-left-style:dashed}
+.svc.ack{border-left-color:var(--warn)}
+.svc.pending{border-left-color:var(--unk)}
+.svc.down .det,.svc.drift .det,.svc.ack .det,.svc.pending .det{display:block}
+.svc.down .det{color:var(--bad-ink);font-weight:600}
+.svc.drift .det{color:var(--bad-ink)}
+.svc .act.ghost{opacity:.55} .svc:hover .act.ghost,.svc:focus-within .act.ghost{opacity:1}
+.svc.down .act.ghost,.svc.drift .act.ghost{opacity:1}
+
+/* ---- incidents list on overview ---------------------------------------- */
+.inc{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line2)}
+.inc:last-child{border-bottom:0}
+.inc .dot{width:9px;height:9px;border-radius:99px;background:var(--bad);flex:none}
+.inc .who{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.inc .seg{margin-left:6px}
+.inc .for{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--bad-ink);font-weight:650;white-space:nowrap}
+
+/* ---- simple view ------------------------------------------------------ */
 .simple h3{font-size:15px;margin:0 0 6px}
-.simple p{margin:0 0 10px;max-width:68ch;color:var(--fg)}
+.simple p{margin:0 0 10px;max-width:70ch;color:var(--fg);line-height:1.6}
 .simple .q{color:var(--mut);font-size:13px}
-.stack{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-.box{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--card)}
+.stack{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-bottom:14px}
+.box{border:1px solid var(--line);border-radius:var(--r);padding:14px;background:var(--card)}
 .box .hd{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-weight:650}
-.dot{width:10px;height:10px;border-radius:99px;background:var(--up);flex:none}
-.dot.bad{background:var(--bad)} .dot.ack{background:var(--warnc)} .dot.unk{background:var(--mut)}
-.unver{font-size:12px;color:var(--warnc);font-weight:600}
+.dot{width:10px;height:10px;border-radius:99px;background:var(--ok);flex:none}
+.dot.bad{background:var(--bad)} .dot.ack{background:var(--warn)} .dot.unk{background:var(--unk)}
+.unver{font-size:12px;color:var(--warn-ink);font-weight:600}
+
+/* ---- topology --------------------------------------------------------- */
 figure{margin:0;overflow-x:auto}
-/* SCOPED to the topology figure. This was a bare `svg{}` selector, which also
-   matched the 26px header logo and the diagram legend -- min-width:660px blew
-   the logo up to 660px square. An element selector carrying a layout
-   constraint will find every other element of that type on the page. */
+/* SCOPED to the topology figure. This was once a bare `svg{}` selector,
+   which also matched the 26px header logo -- min-width:660px blew it up to
+   660px square. An element selector carrying a layout constraint finds every
+   other element of that type on the page. */
 #topo svg{display:block;min-width:660px;max-width:100%;height:auto}
-.svg-l{fill:var(--fg);font:12px ui-sans-serif,system-ui,sans-serif}
+.svg-l{fill:var(--fg);font:12px -apple-system,system-ui,sans-serif}
 .svg-s{fill:var(--mut);font:10px ui-monospace,monospace}
 .svg-box{fill:var(--card);stroke:var(--line);stroke-width:1.5}
 .svg-line{stroke:var(--line);stroke-width:1.5;fill:none}
 .svg-dash{stroke:var(--bad);stroke-width:1.5;fill:none;stroke-dasharray:5 4}
-/* Mobile rules live INSIDE this query so the desktop layout cannot regress. */
+
+/* ---- mobile: every rule inside the query so desktop cannot regress ---- */
 @media (max-width:640px){
+  header{padding:9px 12px;gap:8px}
+  .brand .sub{display:none}
+  .live{display:none}
+  .hbtns .act:not(.icon){padding:6px 9px;font-size:12px}
+  nav button{padding:11px 11px;font-size:12.5px}
+  .band{padding:10px 12px;font-size:13px}
   main{padding:12px}
-  header{padding:11px 14px;gap:8px}
-  h1{font-size:15px;width:100%}
-  .card{padding:13px}
+  .card{padding:13px 14px}
+  .hero{padding:16px;gap:14px;flex-wrap:wrap}
+  .hero .big{font-size:40px}
+  .hero .chips{margin-left:0;width:100%;justify-content:flex-start}
   .kpi .n{font-size:22px}
-  nav button{padding:11px 12px;font-size:13px}
-  button.act{min-height:44px;padding:8px 14px}
+  .cards{grid-template-columns:1fr}
+  .act{min-height:44px}
+  .act.ghost{min-height:40px}
 }
 </style>
 </head>
 <body>
 <header>
-  <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32" width="26" height="26">
-    <rect width="32" height="32" rx="7" class="lg-bg"/>
-    <path d="M9 22 L16 10 L23 19" fill="none" class="lg-ln"
-          stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="16" cy="10" r="3.6" class="lg-a"/>
-    <circle cx="9"  cy="22" r="3.1" class="lg-b"/>
-    <circle cx="23" cy="19" r="3.1" class="lg-b"/>
-  </svg></span>
-  <h1>bevoraSG network map</h1>
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32" width="28" height="28">
+      <rect width="32" height="32" rx="7" class="lg-bg"/>
+      <path d="M9 22 L16 10 L23 19" fill="none" class="lg-ln"
+            stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="16" cy="10" r="3.6" class="lg-a"/>
+      <circle cx="9"  cy="22" r="3.1" class="lg-b"/>
+      <circle cx="23" cy="19" r="3.1" class="lg-b"/>
+    </svg></span>
+    <div><h1>bevoraSG</h1><div class="sub">network map · non-RMA fleet</div></div>
+  </div>
   <span class="grow"></span>
-  <span class="meta" id="meta">loading…</span>
-  <button class="act" id="theme" title="Toggle theme">◐</button>
-  <button class="act" id="refresh">Refresh</button>
-  <form method="POST" action="/logout" style="margin:0"><button class="act" type="submit">Sign out</button></form>
+  <span class="live" id="meta"><i class="pulse" aria-hidden="true"></i><span id="metatxt">loading…</span></span>
+  <div class="hbtns">
+    <button class="act icon" id="theme" title="Toggle theme" aria-label="Toggle theme">◐</button>
+    <button class="act" id="refresh">Refresh</button>
+    <form method="POST" action="/logout" style="margin:0"><button class="act ghost" type="submit">Sign out</button></form>
+  </div>
 </header>
-<nav role="tablist">
+<nav role="tablist" aria-label="Views">
   <button role="tab" aria-selected="true"  data-t="overview">Overview</button>
   <button role="tab" aria-selected="false" data-t="board">Dashboard</button>
   <button role="tab" aria-selected="false" data-t="incidents">Incidents</button>
@@ -201,24 +354,42 @@ figure{margin:0;overflow-x:auto}
   <button role="tab" aria-selected="false" data-t="simple">Simple view</button>
   <button role="tab" aria-selected="false" data-t="targets">Targets</button>
 </nav>
-<main>
+<div class="band unk" id="band" role="status" aria-live="polite">
+  <span class="glyph" aria-hidden="true">…</span>
+  <span class="msg" id="bandmsg">Checking the fleet…</span>
+</div>
+<main id="main">
   <div id="degraded"></div>
 
   <section id="overview">
+    <div class="hero unk" id="herocard">
+      <div class="big" id="heronum">—</div>
+      <div class="txt"><div class="h" id="heroh">Checking…</div><div class="s" id="heros"></div></div>
+      <div class="chips" id="herochips"></div>
+    </div>
     <div class="kpis" id="kpis"></div>
-    <div class="card"><h2>Availability, last 24h</h2><div class="bar" id="timeline"></div>
-      <div class="meta" id="tlmeta" style="margin-top:6px"></div></div>
-    <div class="card"><h2>Discriminating check</h2><div id="invariant"></div>
+    <div class="card">
+      <h2>Availability <span class="n">· last 24 hours, 30-minute buckets</span></h2>
+      <div class="tl" id="timeline" role="img" aria-label="Fleet availability over the last 24 hours"></div>
+      <div class="tlaxis"><span>24h ago</span><span>12h ago</span><span>now</span></div>
+      <div class="legend"><span><i style="background:var(--ok)"></i>all answering</span>
+        <span><i style="background:var(--warn)"></i>degraded · some checks failed</span>
+        <span><i style="background:var(--bad)"></i>major · over 10% failed</span>
+        <span><i style="background:var(--line)"></i>no data</span></div>
+      <div class="meta" id="tlmeta" style="margin-top:6px"></div>
+    </div>
+    <div class="card"><h2>Open incidents <span class="n" id="openn"></span></h2><div id="open"></div></div>
+    <div class="grid2">
+      <div class="card"><h2>Certificates expiring soon</h2><div id="certs"></div></div>
+      <div class="card"><h2>Flappiest · 24h</h2><div id="flap"></div></div>
+      <div class="card"><h2>Slowest · 24h</h2><div id="slow"></div></div>
+    </div>
+    <div class="card"><h2>Board integrity</h2><div id="invariant"></div>
       <p class="meta" style="margin:8px 0 0">Open incidents are counted from the
       event table; down rows are counted from the live board. They are computed
       from different sources and must agree. A mismatch means an incident is
       stranded or was never opened — it is the cheapest signal that this tool
       is lying to you.</p></div>
-    <div class="card"><h2>Certificates expiring soon</h2><div id="certs"></div></div>
-    <div class="stack">
-      <div class="card"><h2>Flappiest</h2><div id="flap"></div></div>
-      <div class="card"><h2>Slowest</h2><div id="slow"></div></div>
-    </div>
   </section>
 
   <section id="board" hidden>
@@ -228,7 +399,7 @@ figure{margin:0;overflow-x:auto}
   </section>
 
   <section id="incidents" hidden>
-    <div class="card"><h2>Incident log</h2>
+    <div class="card"><h2>Incident log <span class="n">· newest first</span></h2>
       <div class="tw"><table>
         <thead><tr><th>Service</th><th>Segment</th><th>Down at</th><th>Recovered</th>
           <th class="num">Duration</th></tr></thead>
@@ -237,7 +408,7 @@ figure{margin:0;overflow-x:auto}
   </section>
 
   <section id="diagram" hidden>
-    <div class="card"><h2>Technical topology</h2><figure id="topo"></figure></div>
+    <div class="card"><h2>Technical topology <span class="n">· drawn from the live snapshot</span></h2><figure id="topo"></figure></div>
   </section>
 
   <section id="simple" hidden class="simple"></section>
@@ -245,19 +416,20 @@ figure{margin:0;overflow-x:auto}
   <section id="targets" hidden>
     <div class="card">
       <h2>Live target list</h2>
-      <p class="meta">This is the list that is <strong>actually probed</strong>.
+      <p class="meta" style="margin:0 0 10px">This is the list that is <strong>actually probed</strong>.
       It is stored in the data volume, not in the source — reading
       <code>server.py</code> tells you nothing about what runs here. Editing and
       saving takes effect on the next cycle; no redeploy, no restart.</p>
       <textarea id="ta" spellcheck="false" aria-label="Target list JSON"></textarea>
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="act" id="save">Save target list</button>
+        <button class="act primary" id="save">Save target list</button>
         <button class="act" id="reload">Discard changes</button>
       </div>
       <div class="msg" id="tmsg"></div>
     </div>
   </section>
 </main>
+<div id="tip" role="tooltip" aria-hidden="true"></div>
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c =>
@@ -292,40 +464,106 @@ async function api(p, o){
   return {ok:r.ok, status:r.status, body:await r.json().catch(()=>({}))};
 }
 
+/* shared tooltip: textContent only -- labels are untrusted data --------- */
+const TIP = $("#tip");
+function tipShow(ev, lines){
+  TIP.textContent = "";
+  lines.forEach((l, i) => {
+    const el = document.createElement(i === 0 ? "b" : "div"); el.textContent = l; TIP.appendChild(el);
+  });
+  TIP.classList.add("on"); TIP.setAttribute("aria-hidden", "false"); tipMove(ev);
+}
+function tipMove(ev){
+  const x = (ev.clientX ?? 0) + 14, y = (ev.clientY ?? 0) + 14;
+  const w = TIP.offsetWidth || 200, h = TIP.offsetHeight || 60;
+  TIP.style.left = Math.min(x, innerWidth - w - 8) + "px";
+  TIP.style.top  = Math.min(y, innerHeight - h - 8) + "px";
+}
+function tipHide(){ TIP.classList.remove("on"); TIP.setAttribute("aria-hidden", "true"); }
+
 const ago = ts => { const s = Math.max(0, Math.floor(Date.now()/1000 - ts));
   if (s < 60) return s+"s"; if (s < 3600) return Math.floor(s/60)+"m";
   if (s < 86400) return Math.floor(s/3600)+"h"; return Math.floor(s/86400)+"d"; };
 const dur = s => s==null ? "—" : s<60 ? s+"s" : s<3600 ? Math.round(s/60)+"m"
   : s<86400 ? (s/3600).toFixed(1)+"h" : (s/86400).toFixed(1)+"d";
 const when = ts => ts ? new Date(ts*1000).toLocaleString() : "—";
-const ep = r => (r.opts && r.opts.host)
-  ? esc(r.opts.host) + esc(r.opts.path && r.opts.path !== "/" ? r.opts.path : "")
-  : esc(r.ip) + ":" + r.port;
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
+/* state model ------------------------------------------------------------
+   One function decides a row's state so the band, hero, tiles, strip and
+   cards can never disagree with each other. Priority: down > drift > pending
+   > acked > up. */
+function stateOf(r){
+  if (r.drift)               return "drift";
+  if (!r.up && !r.ack)       return "down";
+  if (r.pending)             return "pending";
+  if (r.ack)                 return "ack";
+  return "up";
+}
+const LABEL = {up:"Operational", down:"Not answering", drift:"Not reported",
+               pending:"Confirming", ack:"Known"};
 function statePill(r){
-  // Before ack/down: an agent that stopped reporting a row is a MONITORING
-  // failure, and must never read as an ordinary (old) outage.
-  if (r.drift)       return '<span class="pill drift">NOT REPORTED</span>';
-  if (r.up && r.ack) return '<span class="pill ack">up · acked</span>';
-  if (r.up)          return '<span class="pill up">up</span>';
-  if (r.ack === "perm")   return '<span class="pill ack">down by design</span>';
-  if (r.ack === "window") return '<span class="pill ack">maintenance</span>';
-  return '<span class="pill down">DOWN</span>';
+  const s = stateOf(r);
+  if (s === "ack") return `<span class="pill ack">${r.up ? "Known · up"
+      : r.ack === "window" ? "Maintenance" : "Down by design"}</span>`;
+  return `<span class="pill ${s}">${LABEL[s]}</span>`;
+}
+function tally(hosts){
+  const t = {up:0, down:0, drift:0, pending:0, ack:0, n:hosts.length};
+  hosts.forEach(r => t[stateOf(r)]++);
+  return t;
+}
+/* the sentence the whole page leads with */
+function headline(t){
+  const parts = [];
+  if (t.down)    parts.push(plural(t.down, "service") + " not answering");
+  if (t.drift)   parts.push(plural(t.drift, "service") + " not being reported");
+  if (t.pending) parts.push(plural(t.pending, "service") + " confirming");
+  if (t.ack)     parts.push(plural(t.ack, "service") + " known and accepted");
+  const cls = t.down ? "bad" : t.drift ? "drift" : (t.pending || t.ack) ? "warn" : "ok";
+  const glyph = {bad:"✕", drift:"◌", warn:"◐", ok:"✓"}[cls];
+  const head = t.down || t.drift
+    ? parts.slice(0, 2).join(", ")
+    : `All ${t.n} services operational`;
+  const sub = t.down || t.drift ? parts.slice(2).join(" · ")
+            : parts.join(" · ");
+  return {cls, glyph, head, sub, num: t.down || t.drift || t.up};
 }
 
 /* render --------------------------------------------------------------- */
 function renderBoard(d){
   DATA.status = d;
-  $("#meta").textContent = `${d.hosts.length} targets · cycle ${ago(d.ts)} ago · every ${d.refresh}s`;
+  const t = tally(d.hosts), h = headline(t);
+  $("#metatxt").textContent = `${d.hosts.length} targets · checked ${ago(d.ts)} ago · every ${d.refresh}s`;
+  $("#meta").classList.toggle("stale", Date.now()/1000 - d.ts > d.refresh * 3);
+  const band = $("#band");
+  band.className = "band " + h.cls;
+  band.querySelector(".glyph").textContent = h.glyph;
+  $("#bandmsg").innerHTML = esc(h.head) + (h.sub ? `<small>${esc(h.sub)}</small>` : "");
   $("#degraded").innerHTML = d.history_ok ? "" :
     '<div class="banner">History storage is unavailable, so incidents, latency '
-    + 'and availability are not being recorded. Live reachability below is '
-    + 'unaffected — that is deliberate: storage failure must never take the '
-    + 'board down.</div>';
+    + 'and availability are not being recorded. Live reachability is unaffected — '
+    + 'that is deliberate: storage failure must never take the board down.</div>';
+  renderHero(d, t, h);
   renderServerStrip(d);
   renderGroups(d);
   renderSimple(d);
   renderTopo(d);
+}
+
+function renderHero(d, t, h){
+  const card = $("#herocard");
+  card.className = "hero " + h.cls;
+  $("#heronum").textContent = t.down || t.drift ? (t.down + t.drift) : t.up;
+  $("#heroh").textContent = h.head;
+  $("#heros").textContent = h.sub || `${t.n} targets across ${new Set(d.hosts.map(r => r.srv || r.seg)).size} servers · checked ${ago(d.ts)} ago`;
+  const chips = [];
+  if (t.down)    chips.push(`<span class="pill down">${t.down} not answering</span>`);
+  if (t.drift)   chips.push(`<span class="pill drift">${t.drift} not reported</span>`);
+  if (t.pending) chips.push(`<span class="pill pending">${t.pending} confirming</span>`);
+  if (t.ack)     chips.push(`<span class="pill ack">${t.ack} known</span>`);
+  chips.push(`<span class="pill up">${t.up} operational</span>`);
+  $("#herochips").innerHTML = chips.join("");
 }
 
 /* Server strip: one card per machine, the whole fleet in one glance ------ */
@@ -333,29 +571,32 @@ function renderServerStrip(d){
   const by = {};
   d.hosts.forEach(r => {
     const k = r.srv || r.seg || "unassigned";
-    const s = by[k] = by[k] || {up:0, acked:0, down:0, n:0};
-    s.n++;
-    if (r.up) s.up++; else if (r.ack) s.acked++; else s.down++;
+    const s = by[k] = by[k] || {up:0, ack:0, down:0, drift:0, pending:0, n:0};
+    s.n++; s[stateOf(r)]++;
   });
-  const order = Object.keys(by).sort();
-  $("#srvstrip").innerHTML = order.map(k => {
+  $("#srvstrip").innerHTML = Object.keys(by).sort().map(k => {
     const s = by[k];
     const m = k.match(/^(.*?)\s*\(([^)]+)\)\s*$/);   // "name (ip)"
     const name = m ? m[1] : k, ip = m ? m[2] : "";
-    const cls = s.down ? "bad" : s.acked ? "warn" : "";
+    const bad = s.down + s.drift;
+    const cls = bad ? "bad" : (s.ack || s.pending) ? "warn" : "";
     const pc = v => (100 * v / Math.max(1, s.n)).toFixed(2) + "%";
+    const pill = bad ? `<span class="pill down">${bad} down</span>`
+               : s.pending ? `<span class="pill pending">${s.pending} confirming</span>`
+               : s.ack ? `<span class="pill ack">${s.ack} known</span>`
+               : `<span class="pill up">all ok</span>`;
     return `<div class="srvcard ${cls}">
-      <div class="nm">${esc(name)}</div>
-      ${ip ? `<div class="ip">${esc(ip)}</div>` : ""}
+      <div class="top"><div><div class="nm">${esc(name)}</div>
+        ${ip ? `<div class="ip">${esc(ip)}</div>` : ""}</div>${pill}</div>
       <div class="row">
-        <span class="big ${s.down ? "no" : "ok"}">${s.down ? s.down : s.up}</span>
-        <span class="cap">${s.down ? `not answering, of ${s.n}`
-                                   : `of ${s.n} answering`}</span>
+        <span class="big ${bad ? "no" : "ok"}">${bad ? bad : s.up}</span>
+        <span class="cap">${bad ? `of ${s.n} not answering` : `of ${s.n} answering`}</span>
       </div>
-      <div class="srvbar" role="img" aria-label="${s.up} up, ${s.acked} acknowledged, ${s.down} down">
-        <i class="u" style="width:${pc(s.up)}"></i>
-        <i class="a" style="width:${pc(s.acked)}"></i>
-        <i class="d" style="width:${pc(s.down)}"></i>
+      <div class="srvbar" role="img" aria-label="${s.up} up, ${s.ack} acknowledged, ${bad} down, ${s.pending} confirming">
+        ${s.up ? `<i class="u" style="flex:${s.up}"></i>` : ""}
+        ${s.ack ? `<i class="a" style="flex:${s.ack}"></i>` : ""}
+        ${s.pending ? `<i class="x" style="flex:${s.pending}"></i>` : ""}
+        ${bad ? `<i class="d" style="flex:${bad}"></i>` : ""}
       </div></div>`;
   }).join("");
 }
@@ -374,6 +615,7 @@ function svcUrl(r){
   const path = (r.opts.path && r.opts.path !== "/") ? r.opts.path : "";
   return `${r.port === 443 ? "https" : "http"}://${h}${path}`;
 }
+const RANK = {down:0, drift:1, pending:2, ack:3, up:4};
 function renderGroups(d){
   const tree = {};
   d.hosts.forEach(r => {
@@ -383,17 +625,28 @@ function renderGroups(d){
   $("#groups").innerHTML = Object.keys(tree).sort().map(sv => {
     const m = sv.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
     const cos = tree[sv];
-    const total = Object.values(cos).reduce((a, v) => a + v.length, 0);
-    const down = Object.values(cos).flat().filter(r => !r.up && !r.ack).length;
+    const all = Object.values(cos).flat();
+    const bad = all.filter(r => ["down","drift"].includes(stateOf(r))).length;
+    // groups with a problem sort first; within a group, problems sort first
+    const coKeys = Object.keys(cos).sort((a, b) => {
+      const ba = cos[a].some(r => RANK[stateOf(r)] < 2), bb = cos[b].some(r => RANK[stateOf(r)] < 2);
+      return (bb - ba) || a.localeCompare(b);
+    });
     return `<div class="srvblock">
       <h3>${esc(m ? m[1] : sv)}
-        ${down ? `<span class="pill down">${down} down</span>`
-               : `<span class="pill up">all ${total} ok</span>`}</h3>
+        ${bad ? `<span class="pill down">${bad} down</span>`
+              : `<span class="pill up">all ${all.length} operational</span>`}</h3>
       ${m ? `<p class="sub">${esc(m[2])}</p>` : ""}
-      ${Object.keys(cos).sort().map(co => `<div class="grp">
-          <h4>${esc(co)} <span class="n">${cos[co].length}</span></h4>
-          <div class="cards">${cos[co].map(svcCard).join("")}</div>
-        </div>`).join("")}
+      ${coKeys.map(co => {
+        const rows = cos[co].slice().sort((a, b) =>
+          (RANK[stateOf(a)] - RANK[stateOf(b)]) || a.label.localeCompare(b.label));
+        const cb = rows.filter(r => RANK[stateOf(r)] < 2).length;
+        return `<div class="grp">
+          <h4>${esc(co)} <span class="n">${rows.length}</span>
+              ${cb ? `<span class="pill down">${cb}</span>` : ""}</h4>
+          <div class="cards">${rows.map(svcCard).join("")}</div>
+        </div>`;
+      }).join("")}
     </div>`;
   }).join("");
   $("#groups").querySelectorAll("button[data-ip]").forEach(b => b.onclick = async () => {
@@ -404,9 +657,13 @@ function renderGroups(d){
   });
 }
 function svcCard(r){
-  const state = (!r.up && !r.ack) ? "down" : r.ack ? "ack" : "";
-  const badDetail = !r.up && !r.ack;
-  return `<div class="svc ${state}">
+  const s = stateOf(r);
+  const cert = r.cert_days == null ? ""
+    : r.cert_days < 0 ? `<span class="bad">cert expired ${Math.abs(r.cert_days)}d ago</span>`
+    : r.cert_days <= 21 ? `<span class="warn">cert ${r.cert_days}d</span>`
+    : `<span>cert ${r.cert_days}d</span>`;
+  const isPush = (r.opts && r.opts.m) === "push";
+  return `<div class="svc ${s}">
     <div class="top">
       <div style="min-width:0">
         <div class="nm">${esc(r.label)}</div>
@@ -416,40 +673,67 @@ function svcCard(r){
     </div>
     <div class="meta">
       ${r.ms != null ? `<span>${r.ms} ms</span>` : ""}
-      ${r.cert_days != null ? `<span>cert ${r.cert_days < 0
-          ? "EXPIRED" : r.cert_days + "d"}</span>` : ""}
-      ${r.pending ? '<span class="pill pending">confirming…</span>' : ""}
+      ${cert}
+      ${isPush ? `<span>via agent</span>` : ""}
     </div>
-    <div class="det ${badDetail ? "bad" : ""}">${esc(r.detail)}</div>
-    ${r.ack_note ? `<div class="det">${esc(r.ack_note)}</div>` : ""}
-    <button class="act" data-ip="${esc(r.ip)}" data-port="${r.port}">Probe</button>
+    <div class="det">${esc(r.detail)}${r.ack_note ? ` — ${esc(r.ack_note)}` : ""}</div>
+    ${isPush ? "" : `<div class="foot"><button class="act ghost" data-ip="${esc(r.ip)}" data-port="${r.port}">Probe now</button></div>`}
   </div>`;
 }
 
 function renderOverview(o){
   DATA.over = o;
   const av = o.availability == null ? "—" : o.availability.toFixed(2) + "%";
+  const known = o.down - o.down_unacked;
   $("#kpis").innerHTML = `
-    <div class="kpi good"><div class="n">${o.up}</div><div class="l">up</div></div>
-    <div class="kpi ${o.down_unacked ? "bad" : ""}"><div class="n">${o.down_unacked}</div>
-      <div class="l">down (unacked)</div></div>
-    <div class="kpi ${o.down - o.down_unacked ? "warn" : ""}"><div class="n">${o.down - o.down_unacked}</div>
-      <div class="l">acked / by design</div></div>
-    <div class="kpi"><div class="n">${av}</div><div class="l">availability 24h</div></div>
-    <div class="kpi ${o.open_incidents ? "bad" : ""}"><div class="n">${o.open_incidents}</div>
-      <div class="l">open incidents</div></div>
-    <div class="kpi ${o.cert_warn.length ? "warn" : ""}"><div class="n">${o.cert_warn.length}</div>
-      <div class="l">certs &lt; 21d</div></div>
-    <div class="kpi ${o.drift ? "bad" : ""}"><div class="n">${o.drift || 0}</div>
-      <div class="l">not reported by agent</div></div>`;
+    <div class="kpi good"><div class="n">${o.up}</div><div class="l">operational</div></div>
+    <div class="kpi ${o.down_unacked ? "bad" : ""}"><div class="n">${o.down_unacked}</div><div class="l">not answering</div></div>
+    <div class="kpi ${o.drift ? "bad" : ""}"><div class="n">${o.drift || 0}</div><div class="l">not reported by agent</div></div>
+    <div class="kpi ${known ? "warn" : ""}"><div class="n">${known}</div><div class="l">known &amp; accepted</div></div>
+    <div class="kpi ${o.open_incidents ? "bad" : ""}"><div class="n">${o.open_incidents}</div><div class="l">open incidents</div></div>
+    <div class="kpi ${o.cert_warn.length ? "warn" : ""}"><div class="n">${o.cert_warn.length}</div><div class="l">certs &lt; 21 days</div></div>
+    <div class="kpi"><div class="n">${av}</div><div class="l">availability · 24h</div></div>`;
+
+  /* timeline: one button per bucket, tooltip on hover AND focus */
   const tl = o.timeline || [];
-  $("#timeline").innerHTML = tl.length ? tl.map(b => b.pct == null
-    ? '<div class="n" style="height:6px"></div>'
-    : `<div class="${b.pct < 100 ? "p" : ""}" style="height:${Math.max(6, b.pct*.34)}px"
-        title="${new Date(b.ts*1000).toLocaleString()} — ${b.pct}%"></div>`).join("")
-    : '<span class="meta">no samples yet</span>';
+  const T = $("#timeline");
+  T.innerHTML = tl.length ? tl.map((b, i) => {
+    // Thresholds are status semantics, not magnitude: green = every check
+    // answered; amber = degraded (any failed check); red = major (>10% of
+    // checks failed). At 69 targets a single dead service is ~1.4% of checks,
+    // so with the old 50% cutoff one test artefact painted the whole day amber
+    // and the bar could not tell 1 service down from 30. The tooltip and
+    // caption carry the exact figure either way.
+    const cls = b.pct == null ? "n" : b.pct >= 100 ? "" : b.pct >= 90 ? "p" : "d";
+    return `<button class="${cls}" data-i="${i}" aria-label="${b.pct == null ? "no data" : b.pct + "% answering"}"></button>`;
+  }).join("") : '<span class="empty">No samples yet — the first bucket fills after a few cycles.</span>';
+  T.querySelectorAll("button").forEach(btn => {
+    const b = tl[+btn.dataset.i];
+    const lines = () => {
+      const start = new Date(b.ts * 1000), end = new Date((b.ts + 1800) * 1000);
+      const f = d => d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+      return [b.pct == null ? "No data" : b.pct + "% of checks answered",
+              `${f(start)} – ${f(end)}`, b.n ? `${b.n} checks` : ""];
+    };
+    btn.onpointerenter = e => tipShow(e, lines());
+    btn.onpointermove  = tipMove;
+    btn.onpointerleave = tipHide;
+    btn.onfocus = e => { const r = btn.getBoundingClientRect(); tipShow({clientX:r.left, clientY:r.bottom}, lines()); };
+    btn.onblur = tipHide;
+  });
+  const bad = tl.filter(b => b.pct != null && b.pct < 100).length;
   $("#tlmeta").textContent = tl.length
-    ? `${tl.length} buckets · red = a target was down in that bucket` : "";
+    ? (bad ? `${bad} of ${tl.length} buckets had at least one failed check — hover a bar for the exact figure`
+           : `Every check in every bucket answered`) : "";
+
+  /* open incidents */
+  const open = o.open_list || [];
+  $("#openn").textContent = open.length ? `· ${open.length}` : "";
+  $("#open").innerHTML = open.length ? open.map(e => `<div class="inc">
+      <span class="dot"></span><span class="who">${esc(e.label)}<span class="seg">${esc(e.seg)}</span></span>
+      <span class="for">${dur(e.mins * 60)}</span></div>`).join("")
+    : '<div class="empty">None. Everything unacknowledged is answering.</div>';
+
   $("#invariant").innerHTML = `<div class="inv ${o.invariant_ok ? "ok" : "no"}">`
     + (o.invariant_ok ? "✓ " : "✗ ") + esc(o.invariant_detail) + "</div>";
   $("#certs").innerHTML = o.cert_warn.length
@@ -459,12 +743,12 @@ function renderOverview(o){
         <td class="num">${c.days < 0
           ? '<span class="pill down">expired '+Math.abs(c.days)+'d</span>' : c.days}</td></tr>`).join("")
       + "</tbody></table></div>"
-    : '<p class="meta">Nothing expiring within 21 days.</p>';
+    : '<div class="empty">Nothing expiring within 21 days.</div>';
   const list = (rows, f) => rows.length
-    ? '<div class="tw"><table><tbody>' + rows.map(f).join("") + "</tbody></table></div>"
-    : '<p class="meta">Nothing recorded in this window.</p>';
+    ? '<div class="tw"><table style="min-width:0"><tbody>' + rows.map(f).join("") + "</tbody></table></div>"
+    : '<div class="empty">Nothing recorded in this window.</div>';
   $("#flap").innerHTML = list(o.flappiest || [],
-    r => `<tr><td>${esc(r.label)}</td><td class="num">${r.count} outages</td></tr>`);
+    r => `<tr><td>${esc(r.label)}</td><td class="num">${plural(r.count, "outage")}</td></tr>`);
   $("#slow").innerHTML = list(o.slowest || [],
     r => `<tr><td class="seg">${esc(r.ip)}:${r.port}</td><td class="num">${r.ms} ms</td></tr>`);
 }
@@ -472,13 +756,13 @@ function renderOverview(o){
 async function loadEvents(){
   const r = await api("/api/events?limit=200");
   const ev = r.body.events || [];
-  $("#events").innerHTML = ev.length ? ev.map(e => `<tr>
+  $("#events").innerHTML = ev.length ? ev.map(e => `<tr class="${e.up_ts ? "" : "ongoing"}">
     <td><strong>${esc(e.label)}</strong></td><td class="seg">${esc(e.seg)}</td>
     <td class="seg">${when(e.down_ts)}</td>
     <td class="seg">${e.up_ts ? when(e.up_ts) : '<span class="pill down">ongoing</span>'}</td>
     <td class="num">${e.up_ts ? dur(e.duration) : dur(Math.floor(Date.now()/1000 - e.down_ts))}</td>
     </tr>`).join("")
-    : '<tr><td colspan="5" class="meta">No incidents recorded.</td></tr>';
+    : '<tr><td colspan="5" class="empty">No incidents recorded.</td></tr>';
 }
 
 async function loadTargets(){
@@ -513,7 +797,8 @@ function renderSimple(d){
   const segs = {};
   d.hosts.forEach(r => {
     const s = segs[r.seg] = segs[r.seg] || {up:0, down:0, acked:0, rows:[]};
-    if (r.up) s.up++; else if (r.ack) s.acked++; else s.down++;
+    const st = stateOf(r);
+    if (st === "up" || st === "pending") s.up++; else if (st === "ack") s.acked++; else s.down++;
     s.rows.push(r);
   });
   const NOTE = {
@@ -523,10 +808,12 @@ function renderSimple(d){
     "host-165": "The machine itself, plus two database ports that are supposed to "
       + "be closed to the outside world. Those two are checked backwards: they go "
       + "red if they ever become reachable.",
-    "gadonghr":  "The HR system. Every part of it answers on one address under a "
-      + "different path, so each part is checked at its own path.",
-    "bevora-ops":"The operations server. Nothing here can be reached from where "
-      + "this checker runs."
+    "gadonghr":  "The HR system's public side. Every part of it answers on one address "
+      + "under a different path, so each part is checked at its own path.",
+    "gadonghr-internal": "The HR system's internal services. These cannot be reached from "
+      + "outside the machine at all, so a small program on the machine itself checks "
+      + "them every minute and reports back. If that program stops, these go red.",
+    "bevora-ops":"The operations server — the machine this page runs on."
   };
   const card = (name, s) => {
     const bad = s.down > 0, ack = s.down === 0 && s.acked > 0;
@@ -547,8 +834,11 @@ function renderSimple(d){
          shown as an outage, because ordinary restarts cause brief blips and
          reporting those as outages makes the page impossible to trust.</p>
       <p class="q">Amber means we already know about it and decided it is
-         acceptable, either permanently or during planned work. Red always
-         means something nobody has accounted for.</p>
+         acceptable, either permanently or during planned work. A dashed
+         &ldquo;not reported&rdquo; mark means the checker itself has stopped
+         watching that system — that is a problem with the checking, not proof
+         the system is down, and it is treated as urgent either way. Solid red
+         always means something nobody has accounted for.</p>
     </div>
     <div class="stack">${Object.keys(segs).sort().map(k => card(k, segs[k])).join("")}</div>
     <div class="card">
@@ -560,8 +850,8 @@ function renderSimple(d){
          accepts traffic on <strong>exactly one port</strong> across that
          private network — the one its monitoring agents report into.
          Everything else tried (remote login, web) was refused. From the public
-         internet it currently accepts nothing at all, except remote login from
-         one specific address.</p>
+         internet it accepts web traffic for this page, and remote login only
+         from specific addresses.</p>
       <p><strong>That is a setting, not a wall.</strong> Changing one firewall
          rule would make these machines fully reachable to one another. Nobody
          should read this page as saying they are isolated or air-gapped, or
@@ -589,27 +879,28 @@ function renderSimple(d){
    Drawn from the live snapshot rather than hand-maintained, so it cannot drift
    away from what is actually probed. */
 function renderTopo(d){
-  const order = ["edge-165","host-165","gadonghr","bevora-ops"];
+  const order = ["edge-165","host-165","gadonghr","gadonghr-internal","bevora-ops"];
   const segs = {};
   d.hosts.forEach(r => (segs[r.seg] = segs[r.seg] || []).push(r));
   const keys = order.filter(k => segs[k]).concat(
     Object.keys(segs).filter(k => !order.includes(k)).sort());
-  const W = 900, top = 96, rowH = 26, boxW = 300, gap = 28;
+  const W = 900, top = 96, rowH = 24, boxW = 300, gap = 28;
   let y = top, parts = [], maxY = top;
   keys.forEach((k, i) => {
     const rows = segs[k];
     const col = i % 2, x = 60 + col * (boxW + gap * 3);
     if (col === 0 && i) y = maxY + gap;
     const h = 34 + rows.length * rowH;
-    const down = rows.filter(r => !r.up && !r.ack).length;
-    parts.push(`<rect x="${x}" y="${y}" width="${boxW}" height="${h}" rx="9" class="svg-box"/>
+    const down = rows.filter(r => ["down","drift"].includes(stateOf(r))).length;
+    parts.push(`<rect x="${x}" y="${y}" width="${boxW}" height="${h}" rx="10" class="svg-box"/>
       <text x="${x+12}" y="${y+21}" class="svg-l" font-weight="650">${esc(k)}</text>
       <text x="${x+boxW-12}" y="${y+21}" class="svg-s" text-anchor="end">${
         down ? down + " down" : rows.length + " ok"}</text>`);
     rows.forEach((r, j) => {
       const ry = y + 34 + j * rowH + 12;
-      const c = !r.up && !r.ack ? "var(--bad)" : r.ack ? "var(--warnc)" : "var(--up)";
-      parts.push(`<circle cx="${x+18}" cy="${ry-4}" r="4" fill="${c}"/>
+      const st = stateOf(r);
+      const c = st === "down" || st === "drift" ? "var(--bad)" : st === "ack" ? "var(--warn)" : st === "pending" ? "var(--unk)" : "var(--ok)";
+      parts.push(`<circle cx="${x+18}" cy="${ry-4}" r="4" fill="${c}"${st === "drift" ? ' fill-opacity="0" stroke="var(--bad)" stroke-dasharray="2 2"' : ""}/>
         <text x="${x+32}" y="${ry}" class="svg-s">${esc(r.label)}</text>`);
     });
     maxY = Math.max(maxY, y + h);
@@ -628,10 +919,12 @@ function renderTopo(d){
 
 /* poll ----------------------------------------------------------------- */
 async function tick(){
+  const M = $("#main"); M.classList.add("busy");     // hold the frame, no skeleton flash
   try{
     const [s, o] = await Promise.all([api("/api/status"), api("/api/overview")]);
     renderBoard(s.body); renderOverview(o.body);
-  }catch(e){ $("#meta").textContent = "connection lost — retrying"; }
+  }catch(e){ $("#metatxt").textContent = "connection lost — retrying"; $("#meta").classList.add("stale"); }
+  M.classList.remove("busy");
 }
 $("#refresh").onclick = tick;
 try{ const t = localStorage.getItem("netmap-tab");
