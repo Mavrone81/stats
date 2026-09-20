@@ -316,6 +316,11 @@ def validate_targets(raw):
         if exp is not None and (not isinstance(exp, list)
                                 or not all(isinstance(c, int) for c in exp)):
             errs.append(f"[{i}] expect must be a list of ints"); continue
+        want = opts.get("expect_body")
+        if want is not None and (not isinstance(want, str)
+                                 or not 1 <= len(want) <= 200):
+            errs.append(f"[{i}] expect_body must be a string of 1-200 chars")
+            continue
         rec = {
             "ip": ip, "port": port,
             "label": str(t.get("label", "") or f"{ip}:{port}")[:120],
@@ -422,6 +427,9 @@ def cert_days_left(der, now=None):
 # Probes -- one function per mode, dispatched off opts["m"]
 # ---------------------------------------------------------------------------
 _STATUS = re.compile(rb"^HTTP/1\.[01] (\d{3})")
+# Bytes read while hunting for an expect_body marker. One page, not a
+# download: a probe must never be the reason a host runs out of bandwidth.
+BODY_CAP = 65536
 
 
 def _judge(code, opts):
@@ -447,6 +455,31 @@ def judge_with_cert(code, opts, cert_days):
     if cert_days is not None and cert_days < 0:
         return False, f"HTTP {code} but CERT EXPIRED {abs(cert_days)}d ago"
     return up, f"HTTP {code}"
+
+
+def judge_body(up, detail, want, found):
+    """Fold the body-marker result into an HTTP verdict.
+
+    A reverse proxy that can answer WITHOUT the thing being monitored is the
+    reliable way to build a lying dashboard, and this board has been lied to
+    twice: crm.bevorasg.com served a static brochure page for `/` while its
+    backend was long gone, and the 165 catch-all answers 200 "Welcome to
+    nginx!" for any hostname with no vhost at all -- which is how
+    med.awakenfs.store stayed green while resolving for nobody.
+
+    A status code cannot tell those apart. A string only the real page can
+    contain can. `expect_body` is therefore not decoration: for anything
+    behind that catch-all it is the only assertion that means anything.
+
+    Kept pure so the precedence is pinned by a test: a missing marker makes an
+    otherwise healthy 200 DOWN, and never the other way round -- it can only
+    take a verdict away, never grant one.
+    """
+    if want is None:
+        return up, detail
+    if not found:
+        return False, f"{detail} but MARKER MISSING"
+    return up, detail
 
 
 def probe_tcp(ip, port, opts):
@@ -476,12 +509,18 @@ def probe_tcp(ip, port, opts):
 
 
 def _http_exchange(ip, port, opts, use_tls):
-    """GET the path, read ONLY the status line, close.
+    """GET the path, read the status line, close.
 
     GET, never HEAD: an app was found answering HEAD with a redirect that is
     byte-identical to the reverse proxy's catch-all while answering GET
     correctly -- HEAD would have reported a healthy app as missing. Because we
-    never read the body, GET costs the same as HEAD on the wire we care about.
+    normally never read the body, GET costs the same as HEAD on the wire we
+    care about.
+
+    The exception is `opts["expect_body"]`: then we keep reading until the
+    marker turns up or BODY_CAP bytes have gone by, and the marker decides the
+    verdict (see judge_body). That costs one page of traffic per probe, so it
+    is opt-in per target rather than always on.
     """
     host = opts.get("host") or ip
     path = opts.get("path") or "/"
@@ -519,6 +558,19 @@ def _http_exchange(ip, port, opts, use_tls):
             return {"up": False, "ms": ms, "detail": "no status line", "cert_days": cert_days}
         code = int(m.group(1))
         up, detail = judge_with_cert(code, opts, cert_days)
+        want = opts.get("expect_body")
+        if want is not None:
+            needle = want.encode("utf-8", "ignore")
+            while needle not in buf and len(buf) < BODY_CAP:
+                try:
+                    chunk = sock.recv(4096)
+                except Exception:
+                    break
+                if not chunk:
+                    break
+                buf += chunk
+            up, detail = judge_body(up, detail, want, needle in buf)
+            ms = int((time.monotonic() - t0) * 1000)
         return {"up": up, "ms": ms, "code": code, "detail": detail, "cert_days": cert_days}
     except Exception as e:
         return {"up": False, "ms": None, "detail": f"{type(e).__name__}", "cert_days": cert_days}

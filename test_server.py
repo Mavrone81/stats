@@ -325,6 +325,65 @@ class TestPushTTL(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # §4 Target store
 # ---------------------------------------------------------------------------
+class TestBodyMarker(unittest.TestCase):
+    """expect_body: the assertion that survives a reverse proxy answering
+    without its backend. The 165 catch-all returns 200 "Welcome to nginx!"
+    for any unknown Host, so for anything behind it a status code proves
+    nothing and only a string from the real page does."""
+
+    def _serve(self, response):
+        """One-shot HTTP server that sends status line AND body."""
+        import socket as s, threading
+        srv = s.socket(); srv.bind(("127.0.0.1", 0)); srv.listen(1)
+        def run():
+            try:
+                c, _ = srv.accept()
+                c.recv(512)
+                if response is not None:
+                    c.sendall(response)
+                c.close()
+            except Exception:
+                pass
+            finally:
+                srv.close()
+        threading.Thread(target=run, daemon=True).start()
+        return srv.getsockname()[1]
+
+    REAL = (b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n"
+            b"<html><title>Zhong De Tang \xe5\xbf\xa0\xe5\xbe\xb7\xe5\xa0\x82</title></html>")
+    CATCHALL = (b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n"
+                b"<html><head><title>Welcome to nginx!</title></head></html>")
+
+    def test_marker_present_is_up(self):
+        port = self._serve(self.REAL)
+        r = server.probe_http("127.0.0.1", port,
+                              {"expect": [200], "expect_body": "\u5fe0\u5fb7\u5802"})
+        self.assertTrue(r["up"], r["detail"])
+
+    def test_catch_all_200_without_the_marker_is_DOWN(self):
+        """The whole point: a healthy 200 from the wrong server is not up."""
+        port = self._serve(self.CATCHALL)
+        r = server.probe_http("127.0.0.1", port,
+                              {"expect": [200], "expect_body": "\u5fe0\u5fb7\u5802"})
+        self.assertFalse(r["up"])
+        self.assertIn("MARKER MISSING", r["detail"])
+
+    def test_without_expect_body_the_catch_all_still_reads_up(self):
+        """Pins the cost of NOT setting it -- and that the default is unchanged."""
+        port = self._serve(self.CATCHALL)
+        r = server.probe_http("127.0.0.1", port, {"expect": [200]})
+        self.assertTrue(r["up"])
+
+    def test_marker_cannot_rescue_a_bad_status(self):
+        """It may only take a verdict away, never grant one."""
+        self.assertEqual(server.judge_body(False, "HTTP 502", "x", True),
+                         (False, "HTTP 502"))
+
+    def test_no_marker_configured_passes_the_verdict_through(self):
+        self.assertEqual(server.judge_body(True, "HTTP 200", None, False),
+                         (True, "HTTP 200"))
+
+
 class TestTargetValidation(unittest.TestCase):
     def test_accepts_a_good_target(self):
         ts, errs = server.validate_targets([{"ip": "10.0.0.1", "port": 443,
@@ -339,6 +398,20 @@ class TestTargetValidation(unittest.TestCase):
             [{"ip": "10.0.0.1", "port": 443}, {"ip": "bad host!", "port": 1}])
         self.assertIsNone(ts)
         self.assertTrue(errs)
+
+    def test_accepts_and_rejects_expect_body(self):
+        ok, errs = server.validate_targets([{"ip": "a.example", "port": 80,
+                                             "opts": {"m": "http",
+                                                      "expect_body": "忠德堂"}}])
+        self.assertEqual(errs, [])
+        self.assertEqual(ok[0]["opts"]["expect_body"], "忠德堂")
+        for bad in ({"expect_body": ""}, {"expect_body": 7},
+                    {"expect_body": "x" * 201}):
+            o = {"m": "http"}; o.update(bad)
+            ts, errs = server.validate_targets([{"ip": "a.example", "port": 80,
+                                                 "opts": o}])
+            self.assertIsNone(ts, f"{bad} should be rejected")
+            self.assertTrue(errs)
 
     def test_rejects_bad_port_mode_and_expect(self):
         for bad in ([{"ip": "a", "port": 0}],
