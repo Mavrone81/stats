@@ -423,6 +423,36 @@ def cert_days_left(der, now=None):
     return int((na - now).total_seconds() // 86400)
 
 
+def tkey(t):
+    """The identity of a target, for everything that must NOT be shared.
+
+    Was `ip` alone, paired with `port` -- which silently merged every target
+    on one host:port into one. hr.bevorasg.com:443 carries EIGHT probes, one
+    per service path, and they shared a flap counter, an incident, an ack and
+    a history series. The consequences were not cosmetic: `close_event` fires
+    on the first row that comes up, so a healthy sibling CLOSED a broken
+    service's open incident, and one ack silenced all eight.
+
+    A path is what distinguishes those rows, so it belongs in the key. Targets
+    on the default path keep exactly the key they had, which is what keeps
+    their history and open incidents continuous across this change; only rows
+    that were colliding get a new one.
+
+    Returns the host half; every caller pairs it with the port, so the
+    printable key stays `<host>[<path>]:<port>`.
+    """
+    o = t.get("opts") or {}
+    path = o.get("path") or "/"
+    if o.get("m") in ("http", "https") and path != "/":
+        return f'{t["ip"]}{path}'
+    return t["ip"]
+
+
+def row_key(t):
+    """The printable `<host>[<path>]:<port>` used by acks and the UI."""
+    return f'{tkey(t)}:{t["port"]}'
+
+
 # ---------------------------------------------------------------------------
 # Probes -- one function per mode, dispatched off opts["m"]
 # ---------------------------------------------------------------------------
@@ -713,13 +743,13 @@ def load_open_events(conn):
 
 
 def open_event(conn, open_ev, t, now):
-    key = (t["ip"], t["port"])
+    key = (tkey(t), t["port"])
     if conn is None or key in open_ev:
         return
     cur = conn.execute(
         "INSERT INTO event(ip,port,label,seg,down_ts,up_ts,duration) "
         "VALUES(?,?,?,?,?,NULL,NULL)",
-        (t["ip"], t["port"], t.get("label", ""), t.get("seg", ""), now))
+        (tkey(t), t["port"], t.get("label", ""), t.get("seg", ""), now))
     open_ev[key] = cur.lastrowid
 
 
@@ -837,7 +867,7 @@ def run_cycle(targets, conn, state, now=None, executor=None, push_store=None):
 
     snapshot, live_keys = [], set()
     for t, r in zip(targets, results):
-        key = (t["ip"], t["port"])
+        key = (tkey(t), t["port"])
         live_keys.add(key)
         up = confirmed_up(key, bool(r["up"]), fail_counts)
         row = dict(t)
@@ -847,6 +877,7 @@ def run_cycle(targets, conn, state, now=None, executor=None, push_store=None):
             "stale": r.get("stale", False), "drift": r.get("drift", False),
             "push_age": r.get("age"), "agent": r.get("agent"), "ttl": r.get("ttl"),
             "ts": now,
+            "key": row_key(t),
             "pending": (not r["up"]) and up,      # failing, not yet confirmed
         })
         snapshot.append(row)
@@ -855,7 +886,7 @@ def run_cycle(targets, conn, state, now=None, executor=None, push_store=None):
             try:
                 conn.execute(
                     "INSERT INTO sample(ts,ip,port,up,ms) VALUES(?,?,?,?,?)",
-                    (now, t["ip"], t["port"], 1 if up else 0, r.get("ms")))
+                    (now, tkey(t), t["port"], 1 if up else 0, r.get("ms")))
                 if up:
                     close_event(conn, open_ev, key, now)
                 else:
@@ -978,7 +1009,7 @@ def overview(snapshot, conn, acks, window=86400, now=None, buckets=48):
     # Acked hosts are excluded from the open-incident KPI -- otherwise it never
     # reaches zero and people stop reading it.
     unacked_down = [r for r in down_rows
-                    if not ack_state(acks, f'{r["ip"]}:{r["port"]}', now)]
+                    if not ack_state(acks, r["key"], now)]
 
     out = {
         "ts": now, "history_ok": HISTORY_OK, "window": window,
@@ -1471,7 +1502,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == "/api/status":
             rows = []
             for r in STATE["snapshot"]:
-                key = f'{r["ip"]}:{r["port"]}'
+                key = r["key"]
                 rows.append(dict(r, ack=ack_state(acks, key, now),
                                  ack_note=(acks.get(key) or {}).get("note", "")))
             return self._json({"ts": STATE["ts"], "source": STATE["source"],
@@ -1502,7 +1533,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if not ip or not _HOSTRE.match(ip) or not 1 <= port <= 65535:
                 return self._json({"error": "ip and port required"}, 400)
             targets, _ = load_targets()
-            t = next((x for x in targets if x["ip"] == ip and x["port"] == port),
+            # `path` disambiguates hosts carrying several probes; without it the
+            # first row wins, which is the pre-key behaviour.
+            want_path = (q.get("path") or [""])[0]
+            t = next((x for x in targets
+                      if x["ip"] == ip and x["port"] == port
+                      and (not want_path
+                           or (x.get("opts") or {}).get("path") == want_path)),
                      None)
             if t is None:
                 # Only probe what is already on the list: an authenticated
@@ -1608,8 +1645,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         if path == "/api/ack":
             key = str(body.get("key", "")).strip()
-            if not re.match(r"^[A-Za-z0-9._-]{1,253}:\d{1,5}$", key):
-                return self._json({"error": "key must be ip:port"}, 400)
+            if not re.match(r"^[A-Za-z0-9._~@+%/-]{1,300}:\d{1,5}$", key):
+                return self._json({"error": "key must be ip[path]:port"}, 400)
             acks = load_acks()
             if body.get("clear"):
                 acks.pop(key, None)

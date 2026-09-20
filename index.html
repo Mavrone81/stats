@@ -765,7 +765,9 @@ function renderGroups(d){
   }).join("");
   $("#groups").querySelectorAll("button[data-ip]").forEach(b => b.onclick = async () => {
     const t = b.textContent; b.textContent = "…";
-    const r = await api(`/api/probe?ip=${encodeURIComponent(b.dataset.ip)}&port=${b.dataset.port}`);
+    // path disambiguates hosts carrying several probes (8 sit on hr.bevorasg.com:443)
+    const qp = b.dataset.path ? `&path=${encodeURIComponent(b.dataset.path)}` : "";
+    const r = await api(`/api/probe?ip=${encodeURIComponent(b.dataset.ip)}&port=${b.dataset.port}${qp}`);
     b.textContent = r.body.raw ? (r.body.raw.up ? "up now" : "down now") : "error";
     setTimeout(() => b.textContent = t, 4000);
   });
@@ -791,7 +793,7 @@ function svcCard(r){
       ${isPush ? `<span>via agent</span>` : ""}
     </div>
     <div class="det">${esc(r.detail)}${r.ack_note ? ` — ${esc(r.ack_note)}` : ""}</div>
-    ${isPush ? "" : `<div class="foot"><button class="act ghost" data-ip="${esc(r.ip)}" data-port="${r.port}">Probe now</button></div>`}
+    ${isPush ? "" : `<div class="foot"><button class="act ghost" data-ip="${esc(r.ip)}" data-port="${r.port}" data-path="${esc((r.opts && r.opts.path) || "")}">Probe now</button></div>`}
   </div>`;
 }
 

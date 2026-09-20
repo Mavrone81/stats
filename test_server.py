@@ -384,6 +384,51 @@ class TestBodyMarker(unittest.TestCase):
                          (True, "HTTP 200"))
 
 
+class TestTargetKeys(unittest.TestCase):
+    """Several probes may share one host:port -- hr.bevorasg.com:443 carries
+    eight. Until the path joined the key they shared a flap counter, an
+    incident, an ack and a history series, so a healthy sibling closed a
+    broken service's incident and one ack silenced all eight."""
+
+    A = {"ip": "h.example", "port": 443, "opts": {"m": "https", "path": "/api/a"}}
+    B = {"ip": "h.example", "port": 443, "opts": {"m": "https", "path": "/api/b"}}
+    ROOT = {"ip": "h.example", "port": 443, "opts": {"m": "https", "path": "/"}}
+    TCP = {"ip": "h.example", "port": 22, "opts": {"m": "tcp"}}
+
+    def test_same_host_port_different_paths_are_different_keys(self):
+        self.assertNotEqual(server.tkey(self.A), server.tkey(self.B))
+        self.assertEqual(server.row_key(self.A), "h.example/api/a:443")
+
+    def test_default_path_keeps_the_old_key(self):
+        """Continuity: every existing target must keep the key its history and
+        open incidents are already filed under."""
+        self.assertEqual(server.tkey(self.ROOT), "h.example")
+        self.assertEqual(server.tkey(self.TCP), "h.example")
+        self.assertEqual(server.tkey({"ip": "h.example", "port": 443, "opts": {}}),
+                         "h.example")
+
+    def test_a_healthy_sibling_does_not_close_the_others_incident(self):
+        conn = sqlite3.connect(":memory:")
+        conn.executescript(server.SCHEMA if hasattr(server, "SCHEMA") else "")
+        conn.execute("CREATE TABLE IF NOT EXISTS event(id INTEGER PRIMARY KEY "
+                     "AUTOINCREMENT, ip TEXT, port INTEGER, label TEXT, seg TEXT,"
+                     " down_ts INTEGER, up_ts INTEGER, duration INTEGER)")
+        open_ev = {}
+        server.open_event(conn, open_ev, self.A, 1000)      # A goes down
+        self.assertEqual(len(open_ev), 1)
+        # B recovering must not touch A's incident
+        server.close_event(conn, open_ev, (server.tkey(self.B), 443), 1100)
+        self.assertEqual(len(open_ev), 1, "B's recovery closed A's incident")
+        server.close_event(conn, open_ev, (server.tkey(self.A), 443), 1200)
+        self.assertEqual(len(open_ev), 0)
+
+    def test_ack_of_one_path_does_not_silence_the_other(self):
+        now = 1000
+        acks = {server.row_key(self.A): {"until": None, "note": "known"}}
+        self.assertTrue(server.ack_state(acks, server.row_key(self.A), now))
+        self.assertFalse(server.ack_state(acks, server.row_key(self.B), now))
+
+
 class TestTargetValidation(unittest.TestCase):
     def test_accepts_a_good_target(self):
         ts, errs = server.validate_targets([{"ip": "10.0.0.1", "port": 443,
