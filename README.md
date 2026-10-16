@@ -55,6 +55,12 @@ added.** The two estates do not share a box, an account or a credential, and
 this board is exactly the kind of file that quietly merges them if nobody says
 otherwise.
 
+**This is enforced on the seed only.** The CI estate-boundary check
+(`scripts/assert-non-rma-only.py`) inspects `server.py`'s seed list; it does
+not see edits made live through the Targets tab, which are the ones that
+actually govern production. Those rely on whoever is on shift applying this
+rule by hand, not an automated check.
+
 ---
 
 ## Why no framework
