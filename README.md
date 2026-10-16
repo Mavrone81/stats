@@ -39,7 +39,7 @@ Never conclude anything about coverage from reading the source.
 
 ## Scope — non-RMA only
 
-This board covers three hosts and nothing else:
+This board covers four hosts and nothing else:
 
 | Segment | Host | What it is |
 |---|---|---|
@@ -47,6 +47,8 @@ This board covers three hosts and nothing else:
 | `host-165` | `165.22.246.45` | the box itself + two ports that must stay closed |
 | `gadonghr` | `157.230.38.96` | HR platform, one hostname, path-routed via Traefik |
 | `bevora-ops` | `157.245.152.227` | the host this tool runs on |
+| `edge-hive` | `206.189.80.225` | Hive web app, candidate page, and an API that must refuse anonymous access |
+| `host-hive` | `206.189.80.225` | the box itself + two ports that must stay closed |
 
 **RMA hosts, target lists and credentials never appear here and must never be
 added.** The two estates do not share a box, an account or a credential, and
